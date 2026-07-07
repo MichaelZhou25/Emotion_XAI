@@ -1,0 +1,69 @@
+dataset:
+  name: SEED-IV
+  root: ""
+  processed_path: ""
+  input_type: lds_de
+  normalize: train
+  num_classes: 4
+  num_subjects: 15
+  num_channels: 62
+  num_bands: 5
+  feature_dim: 310
+  time_steps: 10
+  stride: 1
+  session: 1
+  synthetic:
+    enabled: false
+    samples_per_subject: 120
+
+graph:
+  name: seediv_affective_hierarchy
+  num_nodes: 6
+  num_edges: 5
+
+protocol:
+  name: strict_dg_loso
+  val_ratio: 0.2
+  test_used_for_selection: false
+
+model:
+  name: EAGLE-Net
+  d_model: 64
+  d_proto: 32
+  num_heads: 4
+  dropout: 0.1
+  proto_temperature: 0.5
+  use_hemi: true
+  use_direct_head: true
+  use_proto: true
+  use_edge: true
+  use_concept: true
+  direct_only: false
+
+fusion:
+  alpha_edge: 1.0
+  beta_concept: 0.2
+
+train:
+  epochs: 100
+  batch_size: 64
+  lr: 0.0003
+  weight_decay: 0.0005
+  patience: 20
+  seed: 2026
+  num_workers: 0
+  num_threads: 1
+  grad_clip: 1.0
+  device: auto
+
+loss:
+  lambda_direct: 0.3
+  lambda_proto: 0.5
+  lambda_edge: 0.5
+  lambda_concept: 0.1
+  lambda_consistency: 0.1
+  lambda_radius: 0.01
+  radius_margin: 0.05
+
+logging:
+  save_dir: results/seed_iv/strict

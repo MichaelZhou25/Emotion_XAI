@@ -1,0 +1,48 @@
+SEEDIV_GRAPH = {
+    'name': 'seediv_affective_hierarchy',
+    'dataset': 'SEED-IV',
+    'nodes': ['neutral', 'positive_valence', 'negative_valence', 'happy', 'sad', 'fear'],
+    'classes': ['neutral', 'happy', 'sad', 'fear'],
+    'class_node_indices': [0, 3, 4, 5],
+    'edges': [
+        ('neutral', 'positive_valence'),
+        ('neutral', 'negative_valence'),
+        ('positive_valence', 'happy'),
+        ('negative_valence', 'sad'),
+        ('negative_valence', 'fear'),
+    ],
+    'path_matrix': [
+        [0, 0, 0, 0, 0],
+        [1, 0, 1, 0, 0],
+        [0, 1, 0, 1, 0],
+        [0, 1, 0, 0, 1],
+    ],
+    'edge_targets': {
+        0: [0, 0, 0, 0, 0],
+        1: [1, 0, 1, 0, 0],
+        2: [0, 1, 0, 1, 0],
+        3: [0, 1, 0, 0, 1],
+    },
+    'concept_matrix': [
+        [0.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [-1.0, -0.5, 0.0],
+        [-1.0, 1.0, 1.0],
+    ],
+    'concept_targets': {
+        0: [0.0, 0.0, 0.0],
+        1: [1.0, 1.0, 0.0],
+        2: [-1.0, -0.5, 0.0],
+        3: [-1.0, 1.0, 1.0],
+    },
+    'concept_mask': [1.0, 1.0, 1.0],
+    'semantic_coords': [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [-1.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [-1.0, -0.5, 0.0],
+        [-1.0, 1.0, 1.0],
+    ],
+    'node_depth': [0, 1, 1, 2, 2, 2],
+}

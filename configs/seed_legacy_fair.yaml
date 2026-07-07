@@ -1,0 +1,72 @@
+dataset:
+  name: SEED
+  root: "E:/emotion_rec/eeg_data/ExtractedFeatures"
+  processed_path: "data/cache/seed_lds_de_s1_T10_stride10.npz"
+  input_type: lds_de
+  normalize: train
+  num_classes: 3
+  num_subjects: 15
+  num_channels: 62
+  num_bands: 5
+  feature_dim: 310
+  time_steps: 10
+  stride: 10
+  session: 1
+  synthetic:
+    enabled: false
+    samples_per_subject: 120
+
+graph:
+  name: seed_valence_graph
+  num_nodes: 3
+  num_edges: 2
+
+protocol:
+  name: legacy_loso
+  val_ratio: 0.0
+  test_used_for_selection: true
+
+model:
+  name: EAGLE-Net
+  d_model: 32
+  d_proto: 16
+  num_heads: 4
+  dropout: 0.1
+  proto_temperature: 0.5
+  pre_temporal_pool: none
+  use_hemi: true
+  use_direct_head: true
+  use_proto: true
+  use_edge: true
+  use_concept: true
+  direct_only: false
+
+fusion:
+  gamma_direct: 1.0
+  alpha_proto: 0.3
+  alpha_edge: 0.2
+  beta_concept: 0.1
+
+train:
+  epochs: 100
+  batch_size: 128
+  lr: 0.0003
+  weight_decay: 0.0005
+  patience: null
+  seed: 2026
+  num_workers: 0
+  num_threads: 1
+  grad_clip: 1.0
+  device: auto
+
+loss:
+  lambda_direct: 1.0
+  lambda_proto: 0.2
+  lambda_edge: 0.1
+  lambda_concept: 0.05
+  lambda_consistency: 0.02
+  lambda_radius: 0.001
+  radius_margin: 0.05
+
+logging:
+  save_dir: results/seed/legacy_fair

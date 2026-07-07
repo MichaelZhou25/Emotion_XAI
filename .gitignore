@@ -1,0 +1,66 @@
+# Python cache and test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Local Python environments
+.venv/
+venv/
+env/
+.conda/
+.env
+.env.*
+
+# Dataset files and generated feature caches
+data/cache/
+data/raw/
+data/processed/
+eeg_data/
+ExtractedFeatures/
+*.mat
+*.npz
+
+# Training outputs and experiment logs
+results/
+checkpoints/
+run_logs/
+runs/
+wandb/
+mlruns/
+*.log
+*.pid
+*.tfevents*
+
+# Model artifacts
+*.pth
+*.pt
+*.ckpt
+*.onnx
+
+# Local/private tool state
+.agents/
+.codex/
+
+# Local config overrides
+configs/local*.yaml
+configs/*_local.yaml
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Archives and generated packages
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
