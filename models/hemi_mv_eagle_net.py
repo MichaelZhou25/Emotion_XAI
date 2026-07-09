@@ -3,6 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Function
 
 from models.hyperbolic_prototype import expmap0, poincare_distance
 from models.temporal_encoder import TemporalEncoder
@@ -78,6 +79,41 @@ class TokenEncoder(nn.Module):
 
     def forward(self, x):
         return self.encoder(x)
+
+
+class GradientReversalFunction(Function):
+    @staticmethod
+    def forward(ctx, x, lambd):
+        ctx.lambd = lambd
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return -ctx.lambd * grad_output, None
+
+
+class GradientReversal(nn.Module):
+    def __init__(self, lambd=1.0):
+        super().__init__()
+        self.lambd = float(lambd)
+
+    def forward(self, x):
+        return GradientReversalFunction.apply(x, self.lambd)
+
+
+class SubjectDiscriminator(nn.Module):
+    def __init__(self, d_model, num_subjects, dropout=0.1):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model, num_subjects),
+        )
+
+    def forward(self, z):
+        return self.net(z)
 
 
 class HemisphericEvidenceFusion(nn.Module):
@@ -271,6 +307,13 @@ class HemiMVEAGLENet(nn.Module):
         self.use_channel_view = model_cfg.get('use_channel_view', True)
         self.use_hemi_fusion = model_cfg.get('use_hemi_fusion', True)
         self.use_region_aggregation = model_cfg.get('use_region_aggregation', True)
+        self.use_direct = model_cfg.get('use_direct_head', True)
+        self.use_proto = model_cfg.get('use_proto', True)
+        self.use_edge = model_cfg.get('use_edge', True)
+        self.use_concept = model_cfg.get('use_concept', True)
+        self.num_concepts = model_cfg.get('num_concepts', 12)
+        self.use_domain_adversarial = model_cfg.get('use_domain_adversarial', False)
+        self.num_domains = model_cfg.get('num_domains', dataset_cfg.get('num_subjects', 15))
 
         self.time_embed = nn.Sequential(nn.Linear(self.num_channels * self.num_bands, d_model), nn.LayerNorm(d_model))
         self.time_encoder = TemporalEncoder(cfg)
@@ -281,6 +324,8 @@ class HemiMVEAGLENet(nn.Module):
 
         self.hemi_fusion = HemisphericEvidenceFusion(d_model, model_cfg.get('hemi_pairs'))
         self.region_aggregation = RegionEvidenceAggregation(d_model, model_cfg.get('region_groups'))
+        self.num_hemi_pairs = len(self.hemi_fusion.hemi_pairs)
+        self.num_regions = len(self.region_aggregation.region_groups)
 
         self.time_pool = AttnPool(d_model)
         self.freq_pool = AttnPool(d_model)
@@ -292,6 +337,8 @@ class HemiMVEAGLENet(nn.Module):
         self.proto_branch = VectorHyperbolicPrototypeBranch(cfg, graph)
         self.edge_branch = MultiViewEdgeBranch(cfg, graph)
         self.concept_branch = MultiViewConceptBranch(cfg, self.num_classes)
+        self.grl = GradientReversal(model_cfg.get('grl_lambda', 0.2))
+        self.subject_discriminator = SubjectDiscriminator(d_model, self.num_domains, dropout=dropout)
 
         weights = model_cfg.get('branch_weights', {})
         self.w_direct = weights.get('direct', 1.0)
@@ -319,33 +366,107 @@ class HemiMVEAGLENet(nn.Module):
     def _weighted_pool(tokens, weights):
         return torch.einsum('bl,bld->bd', weights, tokens)
 
+    def _zero_proto(self, x):
+        d_proto = self.cfg['model'].get('d_proto', 32)
+        return {
+            'logits': x.new_zeros((x.shape[0], self.num_classes)),
+            'distance': x.new_zeros((x.shape[0], self.graph['num_nodes'])),
+            'z_hyperbolic': x.new_zeros((x.shape[0], d_proto)),
+            'v': x.new_zeros((x.shape[0], d_proto)),
+            'prototypes': x.new_zeros((self.graph['num_nodes'], d_proto)),
+        }
+
+    def _zero_edge(self, h_time, h_freq, h_hemi, h_region):
+        n_batch = h_time.shape[0]
+        d_model = h_time.shape[-1]
+        n_time = h_time.shape[1]
+        n_freq = h_freq.shape[1]
+        n_pair = h_hemi.shape[1]
+        n_region = h_region.shape[1]
+        n_tokens = n_time + n_freq + n_pair + n_region
+        return {
+            'logits': h_time.new_zeros((n_batch, self.num_classes)),
+            'edge_weights': h_time.new_zeros((n_batch, self.graph['num_edges'])),
+            'edge_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_tokens)),
+            'edge_evidence': h_time.new_zeros((n_batch, self.graph['num_edges'], d_model)),
+            'edge_time_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_time)),
+            'edge_freq_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_freq)),
+            'edge_pair_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_pair)),
+            'edge_region_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_region)),
+        }
+
+    def _zero_concept(self, x):
+        return {
+            'concept_scores': x.new_zeros((x.shape[0], self.num_concepts)),
+            'logits': x.new_zeros((x.shape[0], self.num_classes)),
+        }
+
     def forward(self, x):
-        h_time = self._time_view(x)
-        h_freq = self._freq_view(x)
-        h_channel = self._channel_view(x)
+        n_batch = x.shape[0]
+        d_model = self.cfg['model']['d_model']
+        h_time = self._time_view(x) if self.use_time_view else x.new_zeros((n_batch, self.window_size, d_model))
+        h_freq = self._freq_view(x) if self.use_freq_view else x.new_zeros((n_batch, self.num_bands, d_model))
+        h_channel = self._channel_view(x) if self.use_channel_view else x.new_zeros((n_batch, self.num_channels, d_model))
 
-        h_hemi, pair_attention = self.hemi_fusion(h_channel)
-        h_region, region_attention = self.region_aggregation(h_hemi)
+        if self.use_hemi_fusion and self.use_channel_view:
+            h_hemi, pair_attention = self.hemi_fusion(h_channel)
+        else:
+            h_hemi = x.new_zeros((n_batch, self.num_hemi_pairs, d_model))
+            pair_attention = x.new_zeros((n_batch, self.num_hemi_pairs))
+        if self.use_region_aggregation and self.use_hemi_fusion and self.use_channel_view:
+            h_region, region_attention = self.region_aggregation(h_hemi)
+        else:
+            h_region = x.new_zeros((n_batch, self.num_regions, d_model))
+            region_attention = x.new_zeros((n_batch, self.num_regions))
 
-        z_time, time_attention = self.time_pool(h_time)
-        z_freq, freq_attention = self.freq_pool(h_freq)
-        z_channel, channel_attention = self.channel_pool(h_channel)
+        if self.use_time_view:
+            z_time, time_attention = self.time_pool(h_time)
+        else:
+            z_time = x.new_zeros((n_batch, d_model))
+            time_attention = x.new_zeros((n_batch, self.window_size))
+        if self.use_freq_view:
+            z_freq, freq_attention = self.freq_pool(h_freq)
+        else:
+            z_freq = x.new_zeros((n_batch, d_model))
+            freq_attention = x.new_zeros((n_batch, self.num_bands))
+        if self.use_channel_view:
+            z_channel, channel_attention = self.channel_pool(h_channel)
+        else:
+            z_channel = x.new_zeros((n_batch, d_model))
+            channel_attention = x.new_zeros((n_batch, self.num_channels))
         z_hemi = self._weighted_pool(h_hemi, pair_attention)
         z_region = self._weighted_pool(h_region, region_attention)
 
         z_views = torch.stack([z_time, z_freq, z_channel, z_hemi, z_region], dim=1)
         view_logits = self.view_gate(z_views).squeeze(-1)
+        view_mask = torch.tensor(
+            [
+                self.use_time_view,
+                self.use_freq_view,
+                self.use_channel_view,
+                self.use_hemi_fusion and self.use_channel_view,
+                self.use_region_aggregation and self.use_hemi_fusion and self.use_channel_view,
+            ],
+            dtype=torch.bool,
+            device=x.device,
+        )
+        view_logits = view_logits.masked_fill(~view_mask.view(1, -1), -1e4)
         view_weights = torch.softmax(view_logits, dim=1)
         z_fused = torch.einsum('bv,bvd->bd', view_weights, z_views)
 
-        logits_direct = self.direct_branch(z_fused)
-        proto = self.proto_branch(z_fused)
-        edge = self.edge_branch(h_time, h_freq, h_hemi, h_region)
-        concept = self.concept_branch(z_freq, z_hemi, z_region)
+        logits_direct = self.direct_branch(z_fused) if self.use_direct else z_fused.new_zeros((n_batch, self.num_classes))
+        proto = self.proto_branch(z_fused) if self.use_proto else self._zero_proto(z_fused)
+        edge = self.edge_branch(h_time, h_freq, h_hemi, h_region) if self.use_edge else self._zero_edge(h_time, h_freq, h_hemi, h_region)
+        concept = self.concept_branch(z_freq, z_hemi, z_region) if self.use_concept else self._zero_concept(z_fused)
+        domain_logits = (
+            self.subject_discriminator(self.grl(z_fused))
+            if self.use_domain_adversarial
+            else z_fused.new_zeros((n_batch, self.num_domains))
+        )
 
-        logits_proto = proto['logits']
-        logits_edge = edge['logits']
-        logits_concept = concept['logits']
+        logits_proto = proto['logits'] if self.use_proto else z_fused.new_zeros((n_batch, self.num_classes))
+        logits_edge = edge['logits'] if self.use_edge else z_fused.new_zeros((n_batch, self.num_classes))
+        logits_concept = concept['logits'] if self.use_concept else z_fused.new_zeros((n_batch, self.num_classes))
         logits_final = (
             self.w_direct * logits_direct
             + self.w_proto * logits_proto
@@ -360,6 +481,8 @@ class HemiMVEAGLENet(nn.Module):
             'logits_proto': logits_proto,
             'logits_edge': logits_edge,
             'logits_concept': logits_concept,
+            'domain_logits': domain_logits,
+            'z_fused': z_fused,
             'proto_embedding': proto['z_hyperbolic'],
             'proto_distance': proto['distance'],
             'proto_tangent': proto['v'],

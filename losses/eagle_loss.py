@@ -5,7 +5,7 @@ from losses.consistency_loss import branch_consistency_loss
 from losses.radius_loss import radius_hierarchy_loss
 
 
-def compute_eagle_loss(outputs, labels, graph, cfg):
+def compute_eagle_loss(outputs, labels, graph, cfg, subject_ids=None):
     w = cfg.get('loss', {})
     model_cfg = cfg.get('model', {})
     loss_dict = {}
@@ -21,6 +21,10 @@ def compute_eagle_loss(outputs, labels, graph, cfg):
     if model_cfg.get('use_concept', True): enabled.append('logits_concept')
     loss_dict['consistency'] = branch_consistency_loss(outputs, enabled)
     loss_dict['radius'] = radius_hierarchy_loss(outputs['prototypes'], graph, margin=w.get('radius_margin', 0.05)) if model_cfg.get('use_proto', True) else outputs['logits_final'].new_tensor(0.0)
+    if model_cfg.get('use_domain_adversarial', False) and subject_ids is not None and 'domain_logits' in outputs:
+        loss_dict['domain'] = ce_loss(outputs['domain_logits'], subject_ids)
+    else:
+        loss_dict['domain'] = outputs['logits_final'].new_tensor(0.0)
 
     total = (
         loss_dict['ce_final']
@@ -30,6 +34,7 @@ def compute_eagle_loss(outputs, labels, graph, cfg):
         + w.get('lambda_concept', 0.1) * loss_dict['concept']
         + w.get('lambda_consistency', 0.1) * loss_dict['consistency']
         + w.get('lambda_radius', 0.01) * loss_dict['radius']
+        + w.get('lambda_domain', 0.0) * loss_dict['domain']
     )
     loss_dict['total'] = total
     return total, loss_dict
