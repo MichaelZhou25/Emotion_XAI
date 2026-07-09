@@ -1,0 +1,388 @@
+import math
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from models.hyperbolic_prototype import expmap0, poincare_distance
+from models.temporal_encoder import TemporalEncoder
+
+
+DEFAULT_HEMI_PAIRS = [
+    (0, 2),    # FP1-FP2
+    (3, 4),    # AF3-AF4
+    (5, 13),   # F7-F8
+    (6, 12),   # F5-F6
+    (7, 11),   # F3-F4
+    (8, 10),   # F1-F2
+    (14, 22),  # FT7-FT8
+    (15, 21),  # FC5-FC6
+    (16, 20),  # FC3-FC4
+    (17, 19),  # FC1-FC2
+    (23, 31),  # T7-T8
+    (24, 30),  # C5-C6
+    (25, 29),  # C3-C4
+    (26, 28),  # C1-C2
+    (32, 40),  # TP7-TP8
+    (33, 39),  # CP5-CP6
+    (34, 38),  # CP3-CP4
+    (35, 37),  # CP1-CP2
+    (41, 49),  # P7-P8
+    (42, 48),  # P5-P6
+    (43, 47),  # P3-P4
+    (44, 46),  # P1-P2
+    (50, 56),  # PO7-PO8
+    (51, 55),  # PO5-PO6
+    (52, 54),  # PO3-PO4
+    (57, 61),  # CB1-CB2
+    (58, 60),  # O1-O2
+]
+
+DEFAULT_REGION_GROUPS = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [10, 14],
+    [11, 12, 13, 15, 16, 17],
+    [18, 19, 20, 21],
+    [22, 23, 24, 25, 26],
+]
+
+
+class AttnPool(nn.Module):
+    def __init__(self, d_model):
+        super().__init__()
+        self.score = nn.Linear(d_model, 1)
+
+    def forward(self, tokens):
+        weights = torch.softmax(self.score(tokens).squeeze(-1), dim=1)
+        pooled = torch.einsum('bl,bld->bd', weights, tokens)
+        return pooled, weights
+
+
+class TokenEncoder(nn.Module):
+    def __init__(self, d_model, num_heads=4, dropout=0.1, num_layers=1):
+        super().__init__()
+        layers = []
+        for _ in range(num_layers):
+            layers.append(
+                nn.TransformerEncoderLayer(
+                    d_model=d_model,
+                    nhead=num_heads,
+                    dim_feedforward=4 * d_model,
+                    dropout=dropout,
+                    activation='gelu',
+                    batch_first=True,
+                    norm_first=True,
+                )
+            )
+        self.encoder = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.encoder(x)
+
+
+class HemisphericEvidenceFusion(nn.Module):
+    def __init__(self, d_model, hemi_pairs=None):
+        super().__init__()
+        self.hemi_pairs = hemi_pairs or DEFAULT_HEMI_PAIRS
+        self.fuse = nn.Sequential(
+            nn.Linear(3 * d_model, d_model),
+            nn.LayerNorm(d_model),
+            nn.GELU(),
+        )
+        self.pool = AttnPool(d_model)
+
+    def forward(self, h_channel):
+        left_idx = torch.tensor([p[0] for p in self.hemi_pairs], dtype=torch.long, device=h_channel.device)
+        right_idx = torch.tensor([p[1] for p in self.hemi_pairs], dtype=torch.long, device=h_channel.device)
+        h_left = h_channel.index_select(1, left_idx)
+        h_right = h_channel.index_select(1, right_idx)
+        diff = h_left - h_right
+        asym = torch.abs(diff)
+        summ = h_left + h_right
+        h_hemi = self.fuse(torch.cat([diff, asym, summ], dim=-1))
+        _, pair_attention = self.pool(h_hemi)
+        return h_hemi, pair_attention
+
+
+class RegionEvidenceAggregation(nn.Module):
+    def __init__(self, d_model, region_groups=None):
+        super().__init__()
+        self.region_groups = region_groups or DEFAULT_REGION_GROUPS
+        self.pool = AttnPool(d_model)
+
+    def forward(self, h_hemi):
+        region_tokens = []
+        for group in self.region_groups:
+            idx = torch.tensor(group, dtype=torch.long, device=h_hemi.device)
+            idx = idx[idx < h_hemi.shape[1]]
+            if idx.numel() == 0:
+                region_tokens.append(h_hemi.new_zeros(h_hemi.shape[0], h_hemi.shape[-1]))
+            else:
+                region_tokens.append(h_hemi.index_select(1, idx).mean(dim=1))
+        h_region = torch.stack(region_tokens, dim=1)
+        _, region_attention = self.pool(h_region)
+        return h_region, region_attention
+
+
+class VectorDirectBranch(nn.Module):
+    def __init__(self, d_model, num_classes, dropout=0.1):
+        super().__init__()
+        self.cls = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Dropout(dropout),
+            nn.Linear(d_model, num_classes),
+        )
+
+    def forward(self, z):
+        return self.cls(z)
+
+
+class VectorHyperbolicPrototypeBranch(nn.Module):
+    def __init__(self, cfg, graph):
+        super().__init__()
+        d_model = cfg['model']['d_model']
+        d_proto = cfg['model'].get('d_proto', 32)
+        self.project = nn.Sequential(nn.Linear(d_model, d_model), nn.GELU(), nn.Linear(d_model, d_proto))
+        self.temperature = cfg['model'].get('proto_temperature', 0.5)
+        self.class_node_indices = torch.tensor(
+            graph.get('class_node_indices', list(range(graph['num_classes']))),
+            dtype=torch.long,
+        )
+        coords = torch.tensor(graph['semantic_coords'], dtype=torch.float32)
+        self.coord_proj = nn.Linear(3, d_proto, bias=False)
+        nn.init.xavier_uniform_(self.coord_proj.weight)
+        depth = torch.tensor(graph['node_depth'], dtype=torch.float32).unsqueeze(-1)
+        radius = 0.08 + 0.18 * depth
+        with torch.no_grad():
+            init = self.coord_proj(coords)
+            init = F.normalize(init, dim=-1) * radius
+        self.prototype_tangent = nn.Parameter(init)
+
+    def prototypes(self):
+        return expmap0(self.prototype_tangent)
+
+    def forward(self, z_fused):
+        v = self.project(z_fused)
+        z_hyp = expmap0(v)
+        prototypes = self.prototypes()
+        distance = poincare_distance(z_hyp, prototypes)
+        logits_all = -distance.pow(2) / self.temperature
+        class_indices = self.class_node_indices.to(z_fused.device)
+        logits = logits_all.index_select(1, class_indices)
+        return {
+            'logits': logits,
+            'distance': distance,
+            'z_hyperbolic': z_hyp,
+            'v': v,
+            'prototypes': prototypes,
+        }
+
+
+class MultiViewEdgeBranch(nn.Module):
+    def __init__(self, cfg, graph):
+        super().__init__()
+        d_model = cfg['model']['d_model']
+        self.num_edges = graph['num_edges']
+        self.edge_queries = nn.Parameter(torch.randn(self.num_edges, d_model) * 0.02)
+        self.edge_mlp = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model),
+            nn.GELU(),
+            nn.Linear(d_model, 1),
+        )
+        self.path_matrix = torch.tensor(graph['path_matrix'], dtype=torch.float32)
+
+    def forward(self, h_time, h_freq, h_hemi, h_region):
+        tokens = torch.cat([h_time, h_freq, h_hemi, h_region], dim=1)
+        n_time = h_time.shape[1]
+        n_freq = h_freq.shape[1]
+        n_pair = h_hemi.shape[1]
+        n_region = h_region.shape[1]
+        n_batch, _, d_model = tokens.shape
+
+        q = self.edge_queries.unsqueeze(0).expand(n_batch, -1, -1)
+        score = torch.matmul(q, tokens.transpose(1, 2)) / math.sqrt(d_model)
+        attn = torch.softmax(score, dim=-1)
+        evidence = torch.matmul(attn, tokens)
+        edge_weights = torch.sigmoid(self.edge_mlp(evidence).squeeze(-1))
+        logits = torch.matmul(edge_weights, self.path_matrix.to(tokens.device).t())
+
+        start = 0
+        edge_time_attention = attn[:, :, start:start + n_time]
+        start += n_time
+        edge_freq_attention = attn[:, :, start:start + n_freq]
+        start += n_freq
+        edge_pair_attention = attn[:, :, start:start + n_pair]
+        start += n_pair
+        edge_region_attention = attn[:, :, start:start + n_region]
+
+        return {
+            'logits': logits,
+            'edge_weights': edge_weights,
+            'edge_attention': attn,
+            'edge_evidence': evidence,
+            'edge_time_attention': edge_time_attention,
+            'edge_freq_attention': edge_freq_attention,
+            'edge_pair_attention': edge_pair_attention,
+            'edge_region_attention': edge_region_attention,
+        }
+
+
+class MultiViewConceptBranch(nn.Module):
+    def __init__(self, cfg, num_classes):
+        super().__init__()
+        d_model = cfg['model']['d_model']
+        num_concepts = cfg['model'].get('num_concepts', 12)
+        self.to_concepts = nn.Sequential(
+            nn.LayerNorm(3 * d_model),
+            nn.Linear(3 * d_model, d_model),
+            nn.GELU(),
+            nn.Linear(d_model, num_concepts),
+            nn.Tanh(),
+        )
+        self.cls = nn.Linear(num_concepts, num_classes)
+
+    def forward(self, z_freq, z_hemi, z_region):
+        concept_input = torch.cat([z_freq, z_hemi, z_region], dim=-1)
+        concept_scores = self.to_concepts(concept_input)
+        logits = self.cls(concept_scores)
+        return {'concept_scores': concept_scores, 'logits': logits}
+
+
+class HemiMVEAGLENet(nn.Module):
+    def __init__(self, cfg, graph):
+        super().__init__()
+        self.cfg = cfg
+        self.graph = graph
+        model_cfg = cfg['model']
+        dataset_cfg = cfg['dataset']
+        d_model = model_cfg['d_model']
+        dropout = model_cfg.get('dropout', 0.1)
+        num_heads = model_cfg.get('num_heads', 4)
+        token_layers = model_cfg.get('token_encoder_layers', 1)
+
+        self.num_classes = graph['num_classes']
+        self.window_size = model_cfg.get('window_size', dataset_cfg.get('time_steps', 30))
+        self.num_channels = model_cfg.get('num_channels', dataset_cfg.get('num_channels', 62))
+        self.num_bands = model_cfg.get('num_bands', dataset_cfg.get('num_bands', 5))
+
+        self.use_time_view = model_cfg.get('use_time_view', True)
+        self.use_freq_view = model_cfg.get('use_freq_view', True)
+        self.use_channel_view = model_cfg.get('use_channel_view', True)
+        self.use_hemi_fusion = model_cfg.get('use_hemi_fusion', True)
+        self.use_region_aggregation = model_cfg.get('use_region_aggregation', True)
+
+        self.time_embed = nn.Sequential(nn.Linear(self.num_channels * self.num_bands, d_model), nn.LayerNorm(d_model))
+        self.time_encoder = TemporalEncoder(cfg)
+        self.freq_embed = nn.Sequential(nn.Linear(self.window_size * self.num_channels, d_model), nn.LayerNorm(d_model))
+        self.freq_encoder = TokenEncoder(d_model, num_heads=num_heads, dropout=dropout, num_layers=token_layers)
+        self.channel_embed = nn.Sequential(nn.Linear(self.window_size * self.num_bands, d_model), nn.LayerNorm(d_model))
+        self.channel_encoder = TokenEncoder(d_model, num_heads=num_heads, dropout=dropout, num_layers=token_layers)
+
+        self.hemi_fusion = HemisphericEvidenceFusion(d_model, model_cfg.get('hemi_pairs'))
+        self.region_aggregation = RegionEvidenceAggregation(d_model, model_cfg.get('region_groups'))
+
+        self.time_pool = AttnPool(d_model)
+        self.freq_pool = AttnPool(d_model)
+        self.channel_pool = AttnPool(d_model)
+        self.region_pool = AttnPool(d_model)
+        self.view_gate = nn.Linear(d_model, 1)
+
+        self.direct_branch = VectorDirectBranch(d_model, self.num_classes, dropout=dropout)
+        self.proto_branch = VectorHyperbolicPrototypeBranch(cfg, graph)
+        self.edge_branch = MultiViewEdgeBranch(cfg, graph)
+        self.concept_branch = MultiViewConceptBranch(cfg, self.num_classes)
+
+        weights = model_cfg.get('branch_weights', {})
+        self.w_direct = weights.get('direct', 1.0)
+        self.w_proto = weights.get('proto', 0.3)
+        self.w_edge = weights.get('edge', 0.2)
+        self.w_concept = weights.get('concept', 0.1)
+
+    def _time_view(self, x):
+        n_batch, n_time, n_channel, n_band = x.shape
+        h = self.time_embed(x.reshape(n_batch, n_time, n_channel * n_band))
+        h = self.time_encoder(h.unsqueeze(2).unsqueeze(3)).squeeze(3).squeeze(2)
+        return h
+
+    def _freq_view(self, x):
+        n_batch = x.shape[0]
+        h = x.permute(0, 3, 1, 2).reshape(n_batch, self.num_bands, self.window_size * self.num_channels)
+        return self.freq_encoder(self.freq_embed(h))
+
+    def _channel_view(self, x):
+        n_batch = x.shape[0]
+        h = x.permute(0, 2, 1, 3).reshape(n_batch, self.num_channels, self.window_size * self.num_bands)
+        return self.channel_encoder(self.channel_embed(h))
+
+    @staticmethod
+    def _weighted_pool(tokens, weights):
+        return torch.einsum('bl,bld->bd', weights, tokens)
+
+    def forward(self, x):
+        h_time = self._time_view(x)
+        h_freq = self._freq_view(x)
+        h_channel = self._channel_view(x)
+
+        h_hemi, pair_attention = self.hemi_fusion(h_channel)
+        h_region, region_attention = self.region_aggregation(h_hemi)
+
+        z_time, time_attention = self.time_pool(h_time)
+        z_freq, freq_attention = self.freq_pool(h_freq)
+        z_channel, channel_attention = self.channel_pool(h_channel)
+        z_hemi = self._weighted_pool(h_hemi, pair_attention)
+        z_region = self._weighted_pool(h_region, region_attention)
+
+        z_views = torch.stack([z_time, z_freq, z_channel, z_hemi, z_region], dim=1)
+        view_logits = self.view_gate(z_views).squeeze(-1)
+        view_weights = torch.softmax(view_logits, dim=1)
+        z_fused = torch.einsum('bv,bvd->bd', view_weights, z_views)
+
+        logits_direct = self.direct_branch(z_fused)
+        proto = self.proto_branch(z_fused)
+        edge = self.edge_branch(h_time, h_freq, h_hemi, h_region)
+        concept = self.concept_branch(z_freq, z_hemi, z_region)
+
+        logits_proto = proto['logits']
+        logits_edge = edge['logits']
+        logits_concept = concept['logits']
+        logits_final = (
+            self.w_direct * logits_direct
+            + self.w_proto * logits_proto
+            + self.w_edge * logits_edge
+            + self.w_concept * logits_concept
+        )
+
+        return {
+            'logits': logits_final,
+            'logits_final': logits_final,
+            'logits_direct': logits_direct,
+            'logits_proto': logits_proto,
+            'logits_edge': logits_edge,
+            'logits_concept': logits_concept,
+            'proto_embedding': proto['z_hyperbolic'],
+            'proto_distance': proto['distance'],
+            'proto_tangent': proto['v'],
+            'prototypes': proto['prototypes'],
+            'concept_scores': concept['concept_scores'],
+            'view_weights': view_weights,
+            'time_attention': time_attention,
+            'freq_attention': freq_attention,
+            'channel_attention': channel_attention,
+            'pair_attention': pair_attention,
+            'region_attention': region_attention,
+            'edge_attention': edge['edge_attention'],
+            'edge_weights': edge['edge_weights'],
+            'edge_evidence': edge['edge_evidence'],
+            'edge_time_attention': edge['edge_time_attention'],
+            'edge_freq_attention': edge['edge_freq_attention'],
+            'edge_pair_attention': edge['edge_pair_attention'],
+            'edge_region_attention': edge['edge_region_attention'],
+            'h_time': h_time,
+            'h_freq': h_freq,
+            'h_channel': h_channel,
+            'h_hemi': h_hemi,
+            'h_region': h_region,
+            'h_tok': torch.cat([h_time, h_freq, h_hemi, h_region], dim=1),
+            'h_struct': h_time.unsqueeze(2).unsqueeze(3),
+        }
