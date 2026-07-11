@@ -3,7 +3,7 @@ from tqdm import tqdm
 from losses.eagle_loss import compute_eagle_loss
 
 
-def train_one_epoch(model, loader, optimizer, graph, cfg, device):
+def train_one_epoch(model, loader, optimizer, graph, cfg, device, epoch=None):
     model.train()
     total_loss = 0.0
     total = 0
@@ -18,7 +18,7 @@ def train_one_epoch(model, loader, optimizer, graph, cfg, device):
         subject_id = subject_id.to(device) if subject_id is not None else None
         optimizer.zero_grad(set_to_none=True)
         outputs = model(x)
-        loss, loss_dict = compute_eagle_loss(outputs, y, graph, cfg, subject_ids=subject_id)
+        loss, loss_dict = compute_eagle_loss(outputs, y, graph, cfg, subject_ids=subject_id, epoch=epoch)
         loss.backward()
         if cfg['train'].get('grad_clip', 0) > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg['train']['grad_clip'])

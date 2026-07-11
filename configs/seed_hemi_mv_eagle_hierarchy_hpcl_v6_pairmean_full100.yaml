@@ -1,0 +1,107 @@
+dataset:
+  name: SEED
+  root: "E:/emotion_rec/eeg_data/ExtractedFeatures"
+  processed_path: "data/cache/seed_lds_de_s1_T30_stride1.npz"
+  input_type: lds_de
+  normalize: subject_minmax
+  num_classes: 3
+  num_subjects: 15
+  num_channels: 62
+  num_bands: 5
+  feature_dim: 310
+  time_steps: 30
+  stride: 1
+  session: 1
+  synthetic:
+    enabled: false
+    samples_per_subject: 120
+
+graph:
+  name: seed_valence_graph
+  num_nodes: 3
+  num_edges: 2
+
+protocol:
+  name: legacy_loso
+  val_ratio: 0.0
+  test_used_for_selection: true
+  fold_seed_mode: target
+
+model:
+  name: HemiMVEAGLENet
+  input_mode: multiview_feature
+  d_model: 128
+  d_proto: 32
+  num_heads: 4
+  dropout: 0.2
+  token_encoder_layers: 1
+  proto_temperature: 0.5
+  num_channels: 62
+  num_bands: 5
+  window_size: 30
+  use_time_view: true
+  use_freq_view: true
+  use_channel_view: true
+  use_hemi_fusion: true
+  use_region_aggregation: true
+  use_direct_head: true
+  use_proto: true
+  use_edge: true
+  use_concept: true
+  num_concepts: 12
+  use_domain_adversarial: true
+  num_domains: 15
+  grl_lambda: 0.2
+  branch_weights:
+    direct: 1.0
+    proto: 0.3
+    edge: 0.2
+    concept: 0.1
+
+train:
+  epochs: 100
+  batch_size: 512
+  lr: 0.0005
+  weight_decay: 0.0005
+  patience: null
+  seed: 2026
+  num_workers: 0
+  num_threads: 1
+  grad_clip: 1.0
+  device: auto
+
+loss:
+  lambda_direct: 1.0
+  lambda_proto: 0.2
+  lambda_edge: 0.1
+  lambda_concept: 0.05
+  lambda_consistency: 0.02
+  lambda_radius: 0.001
+  lambda_domain: 0.05
+  radius_margin: 0.05
+  lambda_hp_proto_nce: 0.02
+  lambda_hp_supcon: 0.0
+  lambda_hp_margin: 0.02
+  hp_proto_mode: hierarchy
+  hp_margin_mode: hierarchy
+  hp_margin_pair_reduction: pair_mean
+  hp_temperature: 0.2
+  hp_include_root_ancestor: false
+  hp_leaf_positive_weight: 1.0
+  hp_ancestor_positive_weight: 0.3
+  hp_hierarchy_margin_base: 0.4
+  hp_hierarchy_margin_max: 0.6
+  hp_neutral_margin_boost: 0.0
+  hp_branch_margin_boost: 0.0
+  hp_same_branch_margin_scale: 0.5
+  hp_proto_margin_weight: 0.5
+  hp_pair_weight_base: 0.0
+  hp_neutral_positive_pair_weight: 0.0
+  hp_neutral_negative_pair_weight: 1.0
+  hp_positive_negative_pair_weight: 0.0
+  hp_cross_branch_pair_weight: 0.0
+  hp_same_branch_pair_weight: 0.0
+  hp_same_negative_pair_weight: 0.0
+
+logging:
+  save_dir: results/seed/hpcl/hemi_mv_hierarchy_hpcl_v6_pairmean_full100

@@ -11,6 +11,7 @@ from trainer.evaluate import evaluate
 from utils.logger import append_csv, save_json
 from utils.checkpoint import save_checkpoint
 from utils.safety_checks import warn_legacy_protocol
+from utils.seed import set_seed
 
 
 class LegacyLOSO:
@@ -27,7 +28,10 @@ class LegacyLOSO:
         subjects = self.store.subjects
         target_subjects = self.cfg.get('protocol', {}).get('target_subjects') or subjects
         target_subjects = [int(s) for s in target_subjects]
-        for target in target_subjects:
+        for fold_idx, target in enumerate(target_subjects):
+            fold_seed = self._fold_seed(target, fold_idx)
+            if fold_seed is not None:
+                set_seed(fold_seed)
             fold_dir = self.save_dir / f'target_subject_{target:02d}'
             fold_dir.mkdir(parents=True, exist_ok=True)
             train_sub, val_sub, test_sub = legacy_loso_split(subjects, target)
@@ -42,7 +46,7 @@ class LegacyLOSO:
             best_test = float('-inf')
             best_state = None
             for epoch in range(1, self.cfg['train']['epochs'] + 1):
-                train_m = train_one_epoch(model, train_loader, optimizer, self.graph, self.cfg, self.device)
+                train_m = train_one_epoch(model, train_loader, optimizer, self.graph, self.cfg, self.device, epoch=epoch)
                 test_m, _ = evaluate(model, test_loader, self.graph, self.cfg, self.device)
                 append_csv(fold_dir / 'train_log.csv', {'epoch': epoch, **train_m})
                 append_csv(fold_dir / 'target_test_selection_log.csv', {'epoch': epoch, **test_m})
@@ -65,3 +69,16 @@ class LegacyLOSO:
         summary = {k: {'mean': float(np.mean([m[k] for m in metrics])), 'std': float(np.std([m[k] for m in metrics]))} for k in keys}
         save_json(self.save_dir / 'summary.json', summary)
         print(summary)
+
+    def _fold_seed(self, target, fold_idx):
+        mode = self.cfg.get('protocol', {}).get('fold_seed_mode', 'global')
+        if mode in (None, 'global'):
+            return None
+        base_seed = int(self.cfg['train'].get('seed', 2026))
+        if mode == 'target':
+            return base_seed + int(target)
+        if mode == 'index':
+            return base_seed + int(fold_idx)
+        if mode == 'target_index':
+            return base_seed + int(target) * 100 + int(fold_idx)
+        raise ValueError(f'Unknown fold_seed_mode: {mode}')
