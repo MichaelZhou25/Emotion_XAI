@@ -1,0 +1,7 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a2_grl_ramp_probe.yaml
+
+protocol:
+  target_subjects: [14]
+
+logging:
+  save_dir: results/seed/hpcl/stage1/a2_grl_ramp_target14_resume

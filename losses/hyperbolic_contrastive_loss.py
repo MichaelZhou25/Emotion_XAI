@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from models.hyperbolic_prototype import poincare_distance
+from models.hyperbolic_prototype import expmap0, poincare_distance
 
 
 def _node_maps(graph):
@@ -277,6 +277,89 @@ def hyperbolic_supcon_loss(outputs, labels, temperature=0.2):
     log_prob = logits - torch.log(exp_logits.sum(dim=1, keepdim=True).clamp_min(1e-12))
     pos_log_prob = (positive_mask.float() * log_prob).sum(dim=1) / positive_count.clamp_min(1)
     return -pos_log_prob[anchor_mask].mean()
+
+
+def hyperbolic_subject_centroid_loss(
+    outputs,
+    labels,
+    subject_ids,
+    graph,
+    base_margin=0.2,
+    max_margin=0.6,
+    neutral_boost=0.2,
+    branch_boost=0.1,
+    same_branch_scale=0.5,
+    pull_weight=1.0,
+    margin_weight=0.5,
+    compactness_weight=0.1,
+    pair_weight_base=1.0,
+    neutral_positive_pair_weight=None,
+    neutral_negative_pair_weight=None,
+    positive_negative_pair_weight=None,
+    cross_branch_pair_weight=None,
+    same_branch_pair_weight=None,
+    same_negative_pair_weight=None,
+):
+    z = outputs['proto_embedding']
+    tangent = outputs['proto_tangent']
+    prototypes = _class_prototypes(outputs['prototypes'], graph, z.device)
+    margin_matrix = _hierarchy_margin_matrix(
+        graph,
+        z.device,
+        base_margin=base_margin,
+        max_margin=max_margin,
+        neutral_boost=neutral_boost,
+        branch_boost=branch_boost,
+        same_branch_scale=same_branch_scale,
+    )
+    pair_weights = _hierarchy_pair_weight_matrix(
+        graph,
+        z.device,
+        base_weight=pair_weight_base,
+        neutral_positive_pair_weight=neutral_positive_pair_weight,
+        neutral_negative_pair_weight=neutral_negative_pair_weight,
+        positive_negative_pair_weight=positive_negative_pair_weight,
+        cross_branch_pair_weight=cross_branch_pair_weight,
+        same_branch_pair_weight=same_branch_pair_weight,
+        same_negative_pair_weight=same_negative_pair_weight,
+    )
+
+    if labels.numel() == 0:
+        return z.new_tensor(0.0)
+
+    num_classes = graph['num_classes']
+    group_ids = subject_ids.long() * num_classes + labels.long()
+    unique_groups, inverse = torch.unique(group_ids, sorted=True, return_inverse=True)
+    num_groups = unique_groups.numel()
+    counts = torch.bincount(inverse, minlength=num_groups).to(tangent.dtype).clamp_min(1.0)
+
+    centroid_tangent = tangent.new_zeros((num_groups, tangent.shape[-1]))
+    centroid_tangent.index_add_(0, inverse, tangent)
+    centroid_tangent = centroid_tangent / counts.unsqueeze(1)
+    centroids = expmap0(centroid_tangent)
+    group_classes = unique_groups.remainder(num_classes).long()
+
+    centroid_dist = poincare_distance(centroids, prototypes)
+    positive_dist = centroid_dist.gather(1, group_classes.unsqueeze(1)).squeeze(1)
+    group_margins = margin_matrix.index_select(0, group_classes)
+    group_weights = pair_weights.index_select(0, group_classes)
+    negative_mask = torch.ones_like(group_weights, dtype=torch.bool)
+    negative_mask.scatter_(1, group_classes.unsqueeze(1), False)
+    active_weights = group_weights * negative_mask.float()
+    ranking = F.relu(group_margins + positive_dist.unsqueeze(1) - centroid_dist)
+    ranking = (ranking * active_weights).sum(dim=1) / active_weights.sum(dim=1).clamp_min(1e-8)
+
+    sample_to_centroid = poincare_distance(z, centroids).gather(1, inverse.unsqueeze(1)).squeeze(1)
+    compactness = z.new_zeros(num_groups)
+    compactness.index_add_(0, inverse, sample_to_centroid.pow(2))
+    compactness = compactness / counts
+
+    group_loss = (
+        float(pull_weight) * positive_dist.pow(2)
+        + float(margin_weight) * ranking
+        + float(compactness_weight) * compactness
+    )
+    return group_loss.mean()
 
 
 def hyperbolic_hierarchy_margin_loss(

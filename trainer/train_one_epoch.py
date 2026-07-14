@@ -1,10 +1,27 @@
 import torch
 from tqdm import tqdm
 from losses.eagle_loss import compute_eagle_loss
+from utils.schedules import scheduled_value
 
 
-def train_one_epoch(model, loader, optimizer, graph, cfg, device, epoch=None):
+def _set_grl_progress(model, cfg, epoch):
+    model_cfg = cfg.get('model', {})
+    value = scheduled_value(
+        model_cfg.get('grl_lambda', 0.2),
+        epoch,
+        model_cfg.get('grl_schedule', 'constant'),
+        model_cfg.get('grl_warmup_epochs', 0),
+        model_cfg.get('grl_ramp_epochs', 0),
+    )
+    target = model.module if hasattr(model, 'module') else model
+    if hasattr(target, 'set_grl_lambda'):
+        target.set_grl_lambda(value)
+    return value
+
+
+def train_one_epoch(model, loader, optimizer, graph, cfg, device, epoch=None, ema=None):
     model.train()
+    grl_lambda = _set_grl_progress(model, cfg, epoch)
     total_loss = 0.0
     total = 0
     correct = 0
@@ -23,6 +40,8 @@ def train_one_epoch(model, loader, optimizer, graph, cfg, device, epoch=None):
         if cfg['train'].get('grad_clip', 0) > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg['train']['grad_clip'])
         optimizer.step()
+        if ema is not None:
+            ema.update(model)
         bs = y.size(0)
         total += bs
         total_loss += float(loss.detach()) * bs
@@ -34,7 +53,12 @@ def train_one_epoch(model, loader, optimizer, graph, cfg, device, epoch=None):
             domain_total += bs
         for k, v in loss_dict.items():
             loss_sums[k] = loss_sums.get(k, 0.0) + float(v.detach()) * bs
-    metrics = {'loss': total_loss / max(total,1), 'acc': correct / max(total,1)}
+    metrics = {
+        'loss': total_loss / max(total,1),
+        'acc': correct / max(total,1),
+        'lr': optimizer.param_groups[0]['lr'],
+        'grl_lambda': grl_lambda,
+    }
     if domain_total:
         metrics['domain_acc'] = domain_correct / max(domain_total, 1)
     for k, v in loss_sums.items():

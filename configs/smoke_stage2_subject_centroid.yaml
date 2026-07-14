@@ -1,0 +1,21 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage2_subject_centroid_probe.yaml
+
+dataset:
+  synthetic:
+    enabled: true
+    samples_per_subject: 12
+
+protocol:
+  target_subjects: [0]
+
+train:
+  epochs: 3
+  batch_size: 32
+  lr_warmup_epochs: 1
+
+loss:
+  hp_subject_centroid_warmup_epochs: 0
+  hp_subject_centroid_ramp_epochs: 2
+
+logging:
+  save_dir: results/smoke/stage2_subject_centroid

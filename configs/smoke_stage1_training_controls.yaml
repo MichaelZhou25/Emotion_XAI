@@ -1,0 +1,32 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a1_cosine_lr5_probe.yaml
+
+dataset:
+  synthetic:
+    enabled: true
+    samples_per_subject: 12
+
+protocol:
+  target_subjects: [0]
+
+model:
+  grl_schedule: linear
+  grl_warmup_epochs: 1
+  grl_ramp_epochs: 2
+
+train:
+  epochs: 3
+  batch_size: 32
+  lr_warmup_epochs: 1
+  label_smoothing: 0.05
+  ema:
+    enabled: true
+    decay: 0.995
+    warmup_updates: 2
+
+loss:
+  domain_schedule: linear
+  domain_warmup_epochs: 1
+  domain_ramp_epochs: 2
+
+logging:
+  save_dir: results/smoke/stage1_training_controls

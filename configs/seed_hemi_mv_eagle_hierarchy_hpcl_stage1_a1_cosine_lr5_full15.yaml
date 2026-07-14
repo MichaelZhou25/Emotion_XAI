@@ -1,0 +1,7 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a1_cosine_lr5_probe.yaml
+
+protocol:
+  target_subjects: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+logging:
+  save_dir: results/seed/hpcl/stage1/a1_cosine_lr5_full15_run

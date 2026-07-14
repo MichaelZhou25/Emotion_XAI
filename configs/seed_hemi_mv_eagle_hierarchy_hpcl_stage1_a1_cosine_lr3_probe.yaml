@@ -1,0 +1,10 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a0_fixedseed_probe.yaml
+
+train:
+  lr: 0.0003
+  lr_scheduler: cosine
+  lr_warmup_epochs: 5
+  min_lr: 0.00001
+
+logging:
+  save_dir: results/seed/hpcl/stage1/a1_cosine_lr3_probe

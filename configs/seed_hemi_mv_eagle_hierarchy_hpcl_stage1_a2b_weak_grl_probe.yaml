@@ -1,0 +1,16 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a1_cosine_lr5_probe.yaml
+
+model:
+  grl_lambda: 0.1
+  grl_schedule: linear
+  grl_warmup_epochs: 5
+  grl_ramp_epochs: 25
+
+loss:
+  lambda_domain: 0.025
+  domain_schedule: linear
+  domain_warmup_epochs: 5
+  domain_ramp_epochs: 25
+
+logging:
+  save_dir: results/seed/hpcl/stage1/a2b_weak_grl_probe

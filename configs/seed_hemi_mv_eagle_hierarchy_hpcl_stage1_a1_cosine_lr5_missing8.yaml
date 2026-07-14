@@ -1,0 +1,7 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a1_cosine_lr5_probe.yaml
+
+protocol:
+  target_subjects: [1, 2, 6, 8, 9, 10, 12, 13]
+
+logging:
+  save_dir: results/seed/hpcl/stage1/a1_cosine_lr5_missing8

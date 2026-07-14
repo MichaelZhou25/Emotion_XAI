@@ -1,0 +1,4 @@
+extends: smoke_stage2_subject_centroid.yaml
+
+logging:
+  save_dir: results/smoke/stage2_subject_centroid_v2

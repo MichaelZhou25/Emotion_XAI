@@ -17,7 +17,13 @@ def load_config(path):
     path = Path(path)
     with path.open('r', encoding='utf-8') as f:
         cfg = yaml.safe_load(f)
-    return cfg
+    extends = cfg.pop('extends', None)
+    if extends is None:
+        return cfg
+    base_path = Path(extends)
+    if not base_path.is_absolute():
+        base_path = path.parent / base_path
+    return deep_update(load_config(base_path), cfg)
 
 
 def save_config(cfg, path):

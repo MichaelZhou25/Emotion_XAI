@@ -1,0 +1,11 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a1_cosine_lr5_probe.yaml
+
+model:
+  dropout: 0.3
+
+train:
+  weight_decay: 0.001
+  label_smoothing: 0.05
+
+logging:
+  save_dir: results/seed/hpcl/stage1/a3_regularized_probe

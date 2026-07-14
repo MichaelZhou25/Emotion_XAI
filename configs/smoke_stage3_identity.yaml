@@ -1,0 +1,17 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage3_identity_probe.yaml
+
+dataset:
+  synthetic:
+    enabled: true
+    samples_per_subject: 12
+
+protocol:
+  target_subjects: [0]
+
+train:
+  epochs: 2
+  batch_size: 32
+  lr_warmup_epochs: 1
+
+logging:
+  save_dir: results/smoke/stage3_identity

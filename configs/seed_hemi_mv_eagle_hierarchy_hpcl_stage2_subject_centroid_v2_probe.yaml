@@ -1,0 +1,4 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage2_subject_centroid_probe.yaml
+
+logging:
+  save_dir: results/seed/hpcl/stage2/subject_centroid_v2_probe

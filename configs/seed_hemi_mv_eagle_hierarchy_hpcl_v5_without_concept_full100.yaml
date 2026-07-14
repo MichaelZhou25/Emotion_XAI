@@ -1,0 +1,7 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_v5_focus_full100.yaml
+
+model:
+  use_concept: false
+
+logging:
+  save_dir: results/seed/hpcl/ablation/v5_without_concept_full100

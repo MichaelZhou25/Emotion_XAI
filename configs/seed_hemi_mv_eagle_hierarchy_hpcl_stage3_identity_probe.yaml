@@ -1,0 +1,7 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a1_cosine_lr5_probe.yaml
+
+model:
+  use_view_identity_embeddings: true
+
+logging:
+  save_dir: results/seed/hpcl/stage3/identity_probe

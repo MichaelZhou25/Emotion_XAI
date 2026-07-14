@@ -1,0 +1,7 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a3_regularized_probe.yaml
+
+protocol:
+  target_subjects: [4, 5, 11]
+
+logging:
+  save_dir: results/seed/hpcl/stage1/a3_regularized_lowtail

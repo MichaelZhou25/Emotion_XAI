@@ -1,0 +1,10 @@
+extends: seed_hemi_mv_eagle_hierarchy_hpcl_stage1_a1_cosine_lr5_probe.yaml
+
+train:
+  ema:
+    enabled: true
+    decay: 0.995
+    warmup_updates: 100
+
+logging:
+  save_dir: results/seed/hpcl/stage1/ema995_probe

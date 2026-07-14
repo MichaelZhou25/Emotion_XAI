@@ -5,7 +5,7 @@ from graphs.affective_graph import get_affective_graph
 from data.splits import strict_loso_split
 from data.dataloader import build_fold_loaders
 from models import build_model
-from trainer.engine import build_optimizer
+from trainer.engine import build_ema, build_lr_scheduler, build_optimizer
 from trainer.train_one_epoch import train_one_epoch
 from trainer.evaluate import evaluate
 from utils.logger import append_csv, save_json
@@ -39,28 +39,40 @@ class StrictDGLOSO:
                 'protocol': 'strict_dg_loso', 'target_subject': int(target),
                 'train_subjects': train_sub, 'val_subjects': val_sub, 'test_subjects': test_sub,
                 'model_selection': 'source_val_acc', 'test_used_for_selection': False,
+                'fold_seed': fold_seed,
             })
             train_loader, val_loader, test_loader = build_fold_loaders(self.store, train_sub, val_sub, test_sub, self.cfg)
             model = build_model(self.cfg, self.graph).to(self.device)
             optimizer = build_optimizer(model, self.cfg)
+            scheduler = build_lr_scheduler(optimizer, self.cfg)
+            ema = build_ema(model, self.cfg)
             best_val = float('-inf')
             best_state = None
             wait = 0
             patience = self.cfg['train'].get('patience', 20)
             for epoch in range(1, self.cfg['train']['epochs'] + 1):
-                train_m = train_one_epoch(model, train_loader, optimizer, self.graph, self.cfg, self.device, epoch=epoch)
-                val_m, _ = evaluate(model, val_loader, self.graph, self.cfg, self.device)
+                train_m = train_one_epoch(
+                    model, train_loader, optimizer, self.graph, self.cfg, self.device,
+                    epoch=epoch, ema=ema,
+                )
+                eval_model = ema.module if ema is not None else model
+                val_m, _ = evaluate(eval_model, val_loader, self.graph, self.cfg, self.device)
                 append_csv(fold_dir / 'train_log.csv', {'epoch': epoch, **train_m})
                 append_csv(fold_dir / 'val_log.csv', {'epoch': epoch, **val_m})
                 if val_m['acc'] > best_val:
                     best_val = val_m['acc']
-                    best_state = copy.deepcopy(model.state_dict())
-                    save_checkpoint(fold_dir / 'best_model.pth', model, optimizer, epoch, val_m)
+                    best_state = copy.deepcopy(eval_model.state_dict())
+                    save_checkpoint(
+                        fold_dir / 'best_model.pth', eval_model, optimizer, epoch, val_m,
+                        extra={'model_source': 'ema' if ema is not None else 'online'},
+                    )
                     wait = 0
                 else:
                     wait += 1
                     if patience is not None and wait >= patience:
                         break
+                if scheduler is not None:
+                    scheduler.step()
             model.load_state_dict(best_state)
             test_m, _ = evaluate(model, test_loader, self.graph, self.cfg, self.device)
             test_m['best_val_acc'] = float(best_val)

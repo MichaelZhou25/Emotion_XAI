@@ -100,6 +100,9 @@ class GradientReversal(nn.Module):
     def forward(self, x):
         return GradientReversalFunction.apply(x, self.lambd)
 
+    def set_lambda(self, lambd):
+        self.lambd = float(lambd)
+
 
 class SubjectDiscriminator(nn.Module):
     def __init__(self, d_model, num_subjects, dropout=0.1):
@@ -307,6 +310,7 @@ class HemiMVEAGLENet(nn.Module):
         self.use_channel_view = model_cfg.get('use_channel_view', True)
         self.use_hemi_fusion = model_cfg.get('use_hemi_fusion', True)
         self.use_region_aggregation = model_cfg.get('use_region_aggregation', True)
+        self.use_view_identity_embeddings = model_cfg.get('use_view_identity_embeddings', False)
         self.use_direct = model_cfg.get('use_direct_head', True)
         self.use_proto = model_cfg.get('use_proto', True)
         self.use_edge = model_cfg.get('use_edge', True)
@@ -321,6 +325,14 @@ class HemiMVEAGLENet(nn.Module):
         self.freq_encoder = TokenEncoder(d_model, num_heads=num_heads, dropout=dropout, num_layers=token_layers)
         self.channel_embed = nn.Sequential(nn.Linear(self.window_size * self.num_bands, d_model), nn.LayerNorm(d_model))
         self.channel_encoder = TokenEncoder(d_model, num_heads=num_heads, dropout=dropout, num_layers=token_layers)
+        if self.use_view_identity_embeddings:
+            self.freq_identity = nn.Parameter(torch.empty(1, self.num_bands, d_model))
+            self.channel_identity = nn.Parameter(torch.empty(1, self.num_channels, d_model))
+            nn.init.normal_(self.freq_identity, std=0.02)
+            nn.init.normal_(self.channel_identity, std=0.02)
+        else:
+            self.register_parameter('freq_identity', None)
+            self.register_parameter('channel_identity', None)
 
         self.hemi_fusion = HemisphericEvidenceFusion(d_model, model_cfg.get('hemi_pairs'))
         self.region_aggregation = RegionEvidenceAggregation(d_model, model_cfg.get('region_groups'))
@@ -346,6 +358,9 @@ class HemiMVEAGLENet(nn.Module):
         self.w_edge = weights.get('edge', 0.2)
         self.w_concept = weights.get('concept', 0.1)
 
+    def set_grl_lambda(self, lambd):
+        self.grl.set_lambda(lambd)
+
     def _time_view(self, x):
         n_batch, n_time, n_channel, n_band = x.shape
         h = self.time_embed(x.reshape(n_batch, n_time, n_channel * n_band))
@@ -355,12 +370,18 @@ class HemiMVEAGLENet(nn.Module):
     def _freq_view(self, x):
         n_batch = x.shape[0]
         h = x.permute(0, 3, 1, 2).reshape(n_batch, self.num_bands, self.window_size * self.num_channels)
-        return self.freq_encoder(self.freq_embed(h))
+        h = self.freq_embed(h)
+        if self.freq_identity is not None:
+            h = h + self.freq_identity
+        return self.freq_encoder(h)
 
     def _channel_view(self, x):
         n_batch = x.shape[0]
         h = x.permute(0, 2, 1, 3).reshape(n_batch, self.num_channels, self.window_size * self.num_bands)
-        return self.channel_encoder(self.channel_embed(h))
+        h = self.channel_embed(h)
+        if self.channel_identity is not None:
+            h = h + self.channel_identity
+        return self.channel_encoder(h)
 
     @staticmethod
     def _weighted_pool(tokens, weights):
