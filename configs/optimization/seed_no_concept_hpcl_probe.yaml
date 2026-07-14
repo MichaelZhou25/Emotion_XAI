@@ -1,0 +1,7 @@
+extends: seed_no_concept_control_probe.yaml
+
+loss:
+  lambda_hp_proto_nce: 0.03
+
+logging:
+  save_dir: results/seed/hpcl/optimization/no_concept_hpcl_probe

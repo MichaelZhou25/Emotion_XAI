@@ -1,0 +1,7 @@
+extends: seed_no_concept_control_probe.yaml
+
+model:
+  edge_logit_mode: neutral_evidence
+
+logging:
+  save_dir: results/seed/hpcl/optimization/no_concept_neutral_only_probe

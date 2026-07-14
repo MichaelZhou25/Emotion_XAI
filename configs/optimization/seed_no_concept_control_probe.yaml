@@ -1,0 +1,8 @@
+extends: ../seed_hemi_mv_eagle_hierarchy_hpcl_v5_without_concept_probe.yaml
+
+protocol:
+  target_subjects: [4, 5, 9, 14]
+  fold_seed_mode: target
+
+logging:
+  save_dir: results/seed/hpcl/optimization/no_concept_control_probe

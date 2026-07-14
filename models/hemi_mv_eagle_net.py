@@ -222,6 +222,9 @@ class MultiViewEdgeBranch(nn.Module):
         super().__init__()
         d_model = cfg['model']['d_model']
         self.num_edges = graph['num_edges']
+        self.logit_mode = cfg['model'].get('edge_logit_mode', 'path')
+        if self.logit_mode not in {'path', 'neutral_evidence'}:
+            raise ValueError(f'Unknown edge_logit_mode: {self.logit_mode}')
         self.edge_queries = nn.Parameter(torch.randn(self.num_edges, d_model) * 0.02)
         self.edge_mlp = nn.Sequential(
             nn.LayerNorm(d_model),
@@ -244,7 +247,12 @@ class MultiViewEdgeBranch(nn.Module):
         attn = torch.softmax(score, dim=-1)
         evidence = torch.matmul(attn, tokens)
         edge_weights = torch.sigmoid(self.edge_mlp(evidence).squeeze(-1))
-        logits = torch.matmul(edge_weights, self.path_matrix.to(tokens.device).t())
+        path_matrix = self.path_matrix.to(tokens.device)
+        logits = torch.matmul(edge_weights, path_matrix.t())
+        neutral_evidence = torch.prod(1.0 - edge_weights, dim=1)
+        if self.logit_mode == 'neutral_evidence':
+            root_class_mask = path_matrix.abs().sum(dim=1).eq(0).to(logits.dtype)
+            logits = logits + neutral_evidence.unsqueeze(1) * root_class_mask.unsqueeze(0)
 
         start = 0
         edge_time_attention = attn[:, :, start:start + n_time]
@@ -260,6 +268,7 @@ class MultiViewEdgeBranch(nn.Module):
             'edge_weights': edge_weights,
             'edge_attention': attn,
             'edge_evidence': evidence,
+            'neutral_evidence': neutral_evidence,
             'edge_time_attention': edge_time_attention,
             'edge_freq_attention': edge_freq_attention,
             'edge_pair_attention': edge_pair_attention,
@@ -410,6 +419,7 @@ class HemiMVEAGLENet(nn.Module):
             'edge_weights': h_time.new_zeros((n_batch, self.graph['num_edges'])),
             'edge_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_tokens)),
             'edge_evidence': h_time.new_zeros((n_batch, self.graph['num_edges'], d_model)),
+            'neutral_evidence': h_time.new_zeros((n_batch,)),
             'edge_time_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_time)),
             'edge_freq_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_freq)),
             'edge_pair_attention': h_time.new_zeros((n_batch, self.graph['num_edges'], n_pair)),
@@ -518,6 +528,7 @@ class HemiMVEAGLENet(nn.Module):
             'edge_attention': edge['edge_attention'],
             'edge_weights': edge['edge_weights'],
             'edge_evidence': edge['edge_evidence'],
+            'edge_neutral_evidence': edge['neutral_evidence'],
             'edge_time_attention': edge['edge_time_attention'],
             'edge_freq_attention': edge['edge_freq_attention'],
             'edge_pair_attention': edge['edge_pair_attention'],

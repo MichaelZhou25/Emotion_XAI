@@ -1,0 +1,10 @@
+extends: seed_no_concept_control_probe.yaml
+
+model:
+  branch_weights:
+    direct: 1.0
+    proto: 0.4
+    edge: 0.1
+
+logging:
+  save_dir: results/seed/hpcl/optimization/no_concept_weights_probe
