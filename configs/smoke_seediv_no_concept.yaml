@@ -1,0 +1,18 @@
+extends: seediv_no_concept_cosine_full100.yaml
+
+dataset:
+  synthetic:
+    enabled: true
+    samples_per_subject: 16
+
+protocol:
+  target_subjects: [0]
+  fold_seed_mode: target
+
+train:
+  epochs: 2
+  batch_size: 32
+  lr_warmup_epochs: 1
+
+logging:
+  save_dir: results/smoke/seediv_no_concept
