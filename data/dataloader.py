@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from data.seed import prepare_seed_features
 from data.seed_iv import prepare_seediv_features
+from data.session_selection import parse_sessions, session_tag
 
 
 @dataclass
@@ -50,18 +51,29 @@ def load_feature_store(cfg):
     ds = cfg['dataset']
     if ds.get('synthetic', {}).get('enabled', False):
         return make_synthetic_store(cfg)
+    sessions = parse_sessions(ds.get('sessions', ds.get('session', 1)))
     processed_path = ds.get('processed_path')
     if processed_path and Path(processed_path).exists():
-        return load_npz_store(processed_path)
+        store = load_npz_store(processed_path)
+        cached_sessions = sorted((np.unique(store.session_id) + 1).astype(int).tolist())
+        if cached_sessions != sorted(sessions):
+            raise ValueError(
+                f'Cache {processed_path} contains sessions {cached_sessions}, '
+                f'but config requests {sessions}. Use the matching cache or omit dataset.processed_path.'
+            )
+        return store
     root = ds.get('root')
     if not root:
         raise FileNotFoundError('No dataset.processed_path found and dataset.root is empty. Set synthetic.enabled=true for smoke tests.')
-    processed_path = processed_path or f"data/cache/{ds['name'].lower().replace('-', '')}_{ds.get('input_type','lds_de')}_s{ds.get('session',1)}_T{ds.get('time_steps',10)}.npz"
+    processed_path = processed_path or (
+        f"data/cache/{ds['name'].lower().replace('-', '')}_{ds.get('input_type','lds_de')}"
+        f"_s{session_tag(sessions)}_T{ds.get('time_steps',10)}_stride{ds.get('stride',1)}.npz"
+    )
     name = ds['name'].upper().replace('_', '-')
     if name == 'SEED':
-        prepare_seed_features(root, processed_path, ds.get('time_steps',10), ds.get('stride',1), ds.get('session',1), ds.get('input_type','lds_de'), ds.get('num_channels',62), ds.get('num_bands',5))
+        prepare_seed_features(root, processed_path, ds.get('time_steps',10), ds.get('stride',1), sessions[0], ds.get('input_type','lds_de'), ds.get('num_channels',62), ds.get('num_bands',5), sessions=sessions)
     elif name in ['SEED-IV', 'SEEDIV']:
-        prepare_seediv_features(root, processed_path, ds.get('time_steps',10), ds.get('stride',1), ds.get('session',1), ds.get('input_type','lds_de'), ds.get('num_channels',62), ds.get('num_bands',5))
+        prepare_seediv_features(root, processed_path, ds.get('time_steps',10), ds.get('stride',1), sessions[0], ds.get('input_type','lds_de'), ds.get('num_channels',62), ds.get('num_bands',5), sessions=sessions)
     else:
         raise ValueError(ds['name'])
     return load_npz_store(processed_path)

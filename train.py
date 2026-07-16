@@ -7,6 +7,7 @@ if os.name == 'nt':
 from utils.config import load_config
 from utils.seed import set_seed
 from data.dataloader import load_feature_store
+from data.session_selection import parse_sessions, session_tag
 from protocols.strict_dg_loso import StrictDGLOSO
 from protocols.legacy_loso import LegacyLOSO
 
@@ -14,9 +15,20 @@ from protocols.legacy_loso import LegacyLOSO
 def main():
     parser = argparse.ArgumentParser(description='Train EAGLE-Net')
     parser.add_argument('--config', type=str, required=True, help='Path to yaml config')
+    parser.add_argument(
+        '--sessions', type=str, default=None,
+        help='Override dataset sessions: 1, 2, 3, or 123 (also accepts 1,2,3)',
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    if args.sessions is not None:
+        sessions = parse_sessions(args.sessions)
+        cfg['dataset']['sessions'] = sessions
+        cfg['dataset']['session'] = sessions[0]
+        cfg['dataset']['processed_path'] = None
+        suffix = f"sessions_{session_tag(sessions)}"
+        cfg['logging']['save_dir'] = str(os.path.join(cfg['logging']['save_dir'], suffix))
     import torch
     if cfg.get('train', {}).get('num_threads'):
         torch.set_num_threads(int(cfg['train']['num_threads']))

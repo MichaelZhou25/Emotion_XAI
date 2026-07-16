@@ -1,0 +1,9 @@
+extends: seediv_no_concept_cosine_full100.yaml
+
+dataset:
+  sessions: [2]
+  session: 2
+  processed_path: data/cache/seediv_lds_de_s2_T10_stride1.npz
+
+logging:
+  save_dir: results/seed_iv/no_concept_cosine_session2_full100

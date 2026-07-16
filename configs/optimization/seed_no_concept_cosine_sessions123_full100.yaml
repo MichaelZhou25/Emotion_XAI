@@ -1,0 +1,9 @@
+extends: seed_no_concept_cosine_full100.yaml
+
+dataset:
+  sessions: [1, 2, 3]
+  session: 1
+  processed_path: data/cache/seed_lds_de_s123_T30_stride1.npz
+
+logging:
+  save_dir: results/seed/hpcl/optimization/no_concept_cosine_sessions123_full100

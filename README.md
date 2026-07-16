@@ -37,6 +37,26 @@ trial_id:   [num_samples]
 
 If no processed cache is available, the provided preprocessing scripts can read SEED/SEED-IV extracted `.mat` feature files containing `de_LDS*` or `de*` keys.
 
+## Session Selection
+
+SEED and SEED-IV configs may select one session or combine all three sessions:
+
+```yaml
+dataset:
+  sessions: [1]       # change to [2], [3], or [1, 2, 3]
+```
+
+The same selection can be overridden without editing a config. The CLI override uses a matching automatic cache name and a separate result subdirectory:
+
+```bash
+python train.py --config configs/optimization/seed_no_concept_cosine_full100.yaml --sessions 1
+python train.py --config configs/optimization/seed_no_concept_cosine_full100.yaml --sessions 2
+python train.py --config configs/optimization/seed_no_concept_cosine_full100.yaml --sessions 3
+python train.py --config configs/optimization/seed_no_concept_cosine_full100.yaml --sessions 123
+```
+
+In `123` mode, LOSO remains subject-wise: all three sessions of the held-out subject are assigned to the test set. See the [SEED report](docs/seed_session_results.md) and [SEED-IV report](docs/seediv_session_results.md) for full100 results and protocol caveats.
+
 ## Protocols
 
 ### Strict DG-LOSO
