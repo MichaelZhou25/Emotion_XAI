@@ -18,7 +18,10 @@ class LegacyLOSO:
     def __init__(self, cfg, store):
         self.cfg = cfg
         self.store = store
-        self.graph = get_affective_graph(cfg['dataset']['name'])
+        self.graph = get_affective_graph(
+            cfg['dataset']['name'],
+            cfg.get('graph', {}).get('name'),
+        )
         self.device = torch.device('cuda' if torch.cuda.is_available() and cfg['train'].get('device','auto') != 'cpu' else 'cpu')
         self.save_dir = Path(cfg['logging']['save_dir'])
 

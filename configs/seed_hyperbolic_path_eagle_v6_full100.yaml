@@ -1,0 +1,35 @@
+extends: seed_hyperbolic_path_eagle_v2_full100.yaml
+
+model:
+  detach_path_encoder: true
+  path_dropout: 0.2
+  path_bound_evidence_score: false
+  path_use_relation_bias: true
+  branch_weights:
+    path: 0.5
+    direct: 1.0
+    proto: 0.0
+    edge: 0.5
+    concept: 0.0
+
+loss:
+  lambda_direct: 1.0
+  lambda_path: 0.0
+  lambda_proto: 0.0
+  lambda_edge: 0.0
+  lambda_concept: 0.0
+  lambda_consistency: 0.0
+  lambda_radius: 0.0
+  lambda_domain: 0.05
+  lambda_hp_proto_nce: 0.02
+  lambda_hp_supcon: 0.0
+  lambda_hp_margin: 0.0
+  lambda_hp_subject_centroid: 0.0
+  hp_proto_mode: hierarchy
+  hp_temperature: 0.2
+  hp_include_root_ancestor: false
+  hp_leaf_positive_weight: 1.0
+  hp_ancestor_positive_weight: 0.3
+
+logging:
+  save_dir: results/seed/hyperbolic_path/v6_full100

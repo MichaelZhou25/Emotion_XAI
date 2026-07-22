@@ -1,0 +1,10 @@
+extends: seed_hyperbolic_path_eagle_v2_full100.yaml
+
+model:
+  path_dropout: 0.3
+  path_bound_evidence_score: true
+  path_evidence_score_scale: 1.0
+  path_use_relation_bias: false
+
+logging:
+  save_dir: results/seed/hyperbolic_path/v4_full100

@@ -1,0 +1,20 @@
+extends: seediv_hyperbolic_path_eagle_v2_full100.yaml
+
+graph:
+  name: seediv_neutral_centered_path_graph
+  num_nodes: 6
+  num_edges: 5
+
+model:
+  name: NeutralCenteredHyperbolicPathEAGLENet
+  prototype_root_radius: 0.0
+  prototype_depth_step: 0.22
+
+loss:
+  lambda_hier_root: 0.1
+  lambda_hier_child: 0.3
+  hier_child_balance: true
+  hier_child_max_weight: 3.0
+
+logging:
+  save_dir: results/seed_iv/neutral_centered_path/full100

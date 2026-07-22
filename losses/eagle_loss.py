@@ -2,6 +2,10 @@ from losses.classification_loss import ce_loss
 from losses.edge_loss import edge_bce_loss
 from losses.concept_loss import concept_mse_loss
 from losses.consistency_loss import branch_consistency_loss
+from losses.hierarchical_path_loss import (
+    hierarchical_child_loss,
+    hierarchical_root_loss,
+)
 from losses.hyperbolic_contrastive_loss import (
     hyperbolic_class_margin_loss,
     hyperbolic_hierarchy_margin_loss,
@@ -37,6 +41,18 @@ def compute_eagle_loss(outputs, labels, graph, cfg, subject_ids=None, epoch=None
     loss_dict['ce_final'] = ce_loss(outputs['logits_final'], labels, label_smoothing)
     loss_dict['ce_direct'] = ce_loss(outputs['logits_direct'], labels, label_smoothing) if model_cfg.get('use_direct_head', True) else outputs['logits_final'].new_tensor(0.0)
     loss_dict['ce_proto'] = ce_loss(outputs['logits_proto'], labels, label_smoothing) if model_cfg.get('use_proto', True) else outputs['logits_final'].new_tensor(0.0)
+    loss_dict['ce_path'] = ce_loss(outputs['logits_edge'], labels, label_smoothing) if w.get('lambda_path', 0.0) > 0 else outputs['logits_final'].new_tensor(0.0)
+    loss_dict['hier_root'] = hierarchical_root_loss(
+        outputs, labels, graph, label_smoothing,
+    ) if w.get('lambda_hier_root', 0.0) > 0 else outputs['logits_final'].new_tensor(0.0)
+    loss_dict['hier_child'] = hierarchical_child_loss(
+        outputs,
+        labels,
+        graph,
+        label_smoothing=label_smoothing,
+        balance=w.get('hier_child_balance', True),
+        max_weight=w.get('hier_child_max_weight', 3.0),
+    ) if w.get('lambda_hier_child', 0.0) > 0 else outputs['logits_final'].new_tensor(0.0)
     loss_dict['edge'] = edge_bce_loss(outputs['edge_weights'], labels, graph) if model_cfg.get('use_edge', True) else outputs['logits_final'].new_tensor(0.0)
     loss_dict['concept'] = concept_mse_loss(outputs['concept_scores'], labels, graph) if model_cfg.get('use_concept', True) else outputs['logits_final'].new_tensor(0.0)
     enabled = ['logits_direct']
@@ -144,6 +160,9 @@ def compute_eagle_loss(outputs, labels, graph, cfg, subject_ids=None, epoch=None
         loss_dict['ce_final']
         + w.get('lambda_direct', 0.3) * loss_dict['ce_direct']
         + w.get('lambda_proto', 0.5) * loss_dict['ce_proto']
+        + w.get('lambda_path', 0.0) * loss_dict['ce_path']
+        + w.get('lambda_hier_root', 0.0) * loss_dict['hier_root']
+        + w.get('lambda_hier_child', 0.0) * loss_dict['hier_child']
         + w.get('lambda_edge', 0.5) * loss_dict['edge']
         + w.get('lambda_concept', 0.1) * loss_dict['concept']
         + w.get('lambda_consistency', 0.1) * loss_dict['consistency']

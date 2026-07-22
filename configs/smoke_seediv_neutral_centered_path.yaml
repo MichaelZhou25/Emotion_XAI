@@ -1,0 +1,10 @@
+extends: seediv_neutral_centered_path_eagle_probe.yaml
+
+protocol:
+  target_subjects: [0]
+
+train:
+  epochs: 1
+
+logging:
+  save_dir: results/smoke/seediv_neutral_centered_path

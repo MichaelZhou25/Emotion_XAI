@@ -1,0 +1,11 @@
+extends: seed_hyperbolic_path_eagle_full100.yaml
+
+protocol:
+  target_subjects: [0]
+  fold_seed_mode: target
+
+train:
+  epochs: 1
+
+logging:
+  save_dir: results/smoke/seed_hyperbolic_path

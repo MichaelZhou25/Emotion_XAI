@@ -1,0 +1,37 @@
+extends: seed_hyperbolic_path_eagle_v2_full100.yaml
+
+model:
+  path_dropout: 0.2
+  grl_lambda: 0.1
+  grl_schedule: linear
+  grl_warmup_epochs: 5
+  grl_ramp_epochs: 20
+  branch_weights:
+    path: 0.5
+    direct: 1.0
+    proto: 0.0
+    edge: 0.5
+    concept: 0.0
+
+loss:
+  lambda_direct: 1.0
+  lambda_path: 0.5
+  lambda_proto: 0.0
+  lambda_edge: 0.0
+  lambda_concept: 0.0
+  lambda_consistency: 0.0
+  lambda_radius: 0.0
+  lambda_domain: 0.025
+  domain_schedule: linear
+  domain_warmup_epochs: 5
+  domain_ramp_epochs: 20
+  lambda_hp_proto_nce: 0.02
+  lambda_hp_supcon: 0.0
+  lambda_hp_margin: 0.0
+  lambda_hp_subject_centroid: 0.0
+  hp_schedule: linear
+  hp_warmup_epochs: 5
+  hp_ramp_epochs: 15
+
+logging:
+  save_dir: results/seed/hyperbolic_path/v3_full100

@@ -1,0 +1,35 @@
+extends: seediv_no_concept_cosine_full100.yaml
+
+graph:
+  name: seediv_hyperbolic_path_graph
+  num_nodes: 6
+  num_edges: 5
+
+model:
+  name: HyperbolicPathEAGLENet
+  use_concept: false
+  use_domain_adversarial: false
+  prototype_root_radius: 0.0
+  prototype_depth_step: 0.22
+  branch_weights:
+    path: 1.0
+    direct: 0.2
+    proto: 0.0
+    edge: 1.0
+    concept: 0.0
+
+loss:
+  lambda_direct: 0.0
+  lambda_proto: 0.0
+  lambda_edge: 0.0
+  lambda_concept: 0.0
+  lambda_consistency: 0.0
+  lambda_radius: 0.0
+  lambda_domain: 0.0
+  lambda_hp_proto_nce: 0.0
+  lambda_hp_supcon: 0.0
+  lambda_hp_margin: 0.0
+  lambda_hp_subject_centroid: 0.0
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_path/full100

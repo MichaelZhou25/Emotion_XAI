@@ -432,6 +432,19 @@ class HemiMVEAGLENet(nn.Module):
             'logits': x.new_zeros((x.shape[0], self.num_classes)),
         }
 
+    def _forward_edge(self, h_time, h_freq, h_hemi, h_region, proto):
+        if self.use_edge:
+            return self.edge_branch(h_time, h_freq, h_hemi, h_region)
+        return self._zero_edge(h_time, h_freq, h_hemi, h_region)
+
+    def _combine_logits(self, logits_direct, logits_proto, logits_edge, logits_concept):
+        return (
+            self.w_direct * logits_direct
+            + self.w_proto * logits_proto
+            + self.w_edge * logits_edge
+            + self.w_concept * logits_concept
+        )
+
     def forward(self, x):
         n_batch = x.shape[0]
         d_model = self.cfg['model']['d_model']
@@ -487,7 +500,7 @@ class HemiMVEAGLENet(nn.Module):
 
         logits_direct = self.direct_branch(z_fused) if self.use_direct else z_fused.new_zeros((n_batch, self.num_classes))
         proto = self.proto_branch(z_fused) if self.use_proto else self._zero_proto(z_fused)
-        edge = self.edge_branch(h_time, h_freq, h_hemi, h_region) if self.use_edge else self._zero_edge(h_time, h_freq, h_hemi, h_region)
+        edge = self._forward_edge(h_time, h_freq, h_hemi, h_region, proto)
         concept = self.concept_branch(z_freq, z_hemi, z_region) if self.use_concept else self._zero_concept(z_fused)
         domain_logits = (
             self.subject_discriminator(self.grl(z_fused))
@@ -498,14 +511,9 @@ class HemiMVEAGLENet(nn.Module):
         logits_proto = proto['logits'] if self.use_proto else z_fused.new_zeros((n_batch, self.num_classes))
         logits_edge = edge['logits'] if self.use_edge else z_fused.new_zeros((n_batch, self.num_classes))
         logits_concept = concept['logits'] if self.use_concept else z_fused.new_zeros((n_batch, self.num_classes))
-        logits_final = (
-            self.w_direct * logits_direct
-            + self.w_proto * logits_proto
-            + self.w_edge * logits_edge
-            + self.w_concept * logits_concept
-        )
+        logits_final = self._combine_logits(logits_direct, logits_proto, logits_edge, logits_concept)
 
-        return {
+        outputs = {
             'logits': logits_final,
             'logits_final': logits_final,
             'logits_direct': logits_direct,
@@ -541,3 +549,28 @@ class HemiMVEAGLENet(nn.Module):
             'h_tok': torch.cat([h_time, h_freq, h_hemi, h_region], dim=1),
             'h_struct': h_time.unsqueeze(2).unsqueeze(3),
         }
+        for key in (
+            'edge_relation',
+            'edge_query',
+            'edge_distance',
+            'edge_scores',
+            'raw_edge_evidence_score',
+            'edge_evidence_score',
+            'edge_relation_bias',
+            'edge_log_probs',
+            'path_log_probs',
+            'path_prob',
+            'path_matrix',
+            'node_distance_gain',
+            'class_path_energy',
+            'stop_score',
+            'root_logits',
+            'root_prob',
+            'child_logits',
+            'child_prob',
+        ):
+            if key in edge:
+                outputs[key] = edge[key]
+        if 'prototype_anchor' in proto:
+            outputs['prototype_anchor'] = proto['prototype_anchor']
+        return outputs
