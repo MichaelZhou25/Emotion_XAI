@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from graphs.affective_graph import get_affective_graph
+from losses.consistency_loss import path_direct_js_loss
 from losses.eagle_loss import compute_eagle_loss
 from models import build_model
 from utils.config import load_config
@@ -72,6 +73,75 @@ class NeutralCenteredPathTests(unittest.TestCase):
         seed_outputs = build_model(seed_cfg, seed_graph)(torch.randn(2, 30, 62, 5))
         self.assertEqual(seed_outputs['root_logits'].shape, (2, 3))
         self.assertEqual(seed_outputs['child_logits'].shape, (2, 0))
+
+    def test_explicit_path_and_edge_supervision_are_active(self):
+        cfg = load_config('configs/seediv_neutral_centered_path_nonredundant_probe.yaml')
+        graph = get_affective_graph('SEED-IV', cfg['graph']['name'])
+        labels = torch.tensor([0, 1, 2, 3])
+        outputs = build_model(cfg, graph)(torch.randn(4, 10, 62, 5))
+        total, parts = compute_eagle_loss(outputs, labels, graph, cfg, epoch=1)
+
+        expected_targets = torch.tensor([
+            [0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0],
+            [0, 1, 0, 1, 0],
+            [0, 1, 0, 0, 1],
+        ])
+        actual_targets = torch.tensor([graph['edge_targets'][int(y)] for y in labels])
+        self.assertTrue(torch.equal(actual_targets, expected_targets))
+        self.assertGreater(parts['ce_path'].item(), 0.0)
+        self.assertGreater(parts['edge'].item(), 0.0)
+        self.assertTrue(torch.isfinite(total).item())
+
+    def test_path_primary_disables_logit_fusion_and_uses_js_consistency(self):
+        cfg = load_config('configs/seediv_neutral_centered_path_primary_probe.yaml')
+        graph = get_affective_graph('SEED-IV', cfg['graph']['name'])
+        model = build_model(cfg, graph)
+        outputs = model(torch.randn(4, 10, 62, 5))
+        labels = torch.tensor([0, 1, 2, 3])
+        total, parts = compute_eagle_loss(
+            outputs,
+            labels,
+            graph,
+            cfg,
+            subject_ids=torch.tensor([0, 1, 2, 3]),
+            epoch=1,
+        )
+
+        self.assertEqual(cfg['loss']['lambda_final'], 0.0)
+        self.assertTrue(torch.allclose(outputs['logits'], outputs['logits_edge']))
+        self.assertTrue(torch.allclose(outputs['logits_final'], outputs['logits_edge']))
+        self.assertGreater(parts['consistency'].item(), 0.0)
+        self.assertTrue(torch.isfinite(total).item())
+
+        identical = dict(outputs)
+        identical['logits_direct'] = outputs['logits_edge']
+        self.assertLess(path_direct_js_loss(identical).item(), 1e-7)
+
+    def test_core4_loss_contains_exactly_four_active_terms(self):
+        cfg = load_config('configs/seediv_neutral_centered_path_core4_probe.yaml')
+        graph = get_affective_graph('SEED-IV', cfg['graph']['name'])
+        model = build_model(cfg, graph)
+        outputs = model(torch.randn(4, 10, 62, 5))
+        total, parts = compute_eagle_loss(
+            outputs,
+            torch.tensor([0, 1, 2, 3]),
+            graph,
+            cfg,
+            epoch=1,
+        )
+
+        self.assertEqual(set(parts), {'path', 'edge', 'hpcl', 'direct', 'total'})
+        expected = (
+            parts['path']
+            + 0.1 * parts['edge']
+            + 0.02 * parts['hpcl']
+            + 0.3 * parts['direct']
+        )
+        self.assertTrue(torch.allclose(total, expected))
+        self.assertFalse(cfg['model']['use_domain_adversarial'])
+        expected_logits = outputs['logits_edge'] + 0.2 * outputs['logits_direct']
+        self.assertTrue(torch.allclose(outputs['logits_final'], expected_logits))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,14 @@
+extends: seediv_hyperbolic_edge_only_targetseed_full100.yaml
+
+protocol:
+  target_subjects: [3, 5, 6, 10, 12]
+  fold_seed_mode: target
+
+train:
+  ema:
+    enabled: true
+    decay: 0.995
+    warmup_updates: 100
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_edge_only/ema995_lowtail_probe

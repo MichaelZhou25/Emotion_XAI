@@ -1,0 +1,25 @@
+extends: seediv_neutral_centered_path_eagle_full100.yaml
+
+model:
+  branch_weights:
+    path: 1.0
+    direct: 0.0
+    proto: 0.0
+    edge: 1.0
+    concept: 0.0
+
+loss:
+  lambda_final: 0.0
+  lambda_direct: 0.3
+  lambda_path: 1.0
+  lambda_edge: 0.1
+  edge_loss_from_logits: true
+  edge_positive_weight: 1.0
+  lambda_hier_root: 0.0
+  lambda_hier_child: 0.0
+  lambda_consistency: 0.05
+  consistency_mode: path_direct_js
+  consistency_temperature: 2.0
+
+logging:
+  save_dir: results/seed_iv/neutral_centered_path_primary/full100

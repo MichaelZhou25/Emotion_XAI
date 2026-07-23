@@ -1,0 +1,9 @@
+extends: seediv_hyperbolic_edge_only_full100.yaml
+
+loss:
+  edge_objective: hybrid
+  edge_code_ce_weight: 0.2
+  edge_label_smoothing: 0.0
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_edge_only/v3_full100

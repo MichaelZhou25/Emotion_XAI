@@ -1,0 +1,8 @@
+extends: seediv_hyperbolic_node_edge_v8_full100.yaml
+
+protocol:
+  target_subjects: [0, 4, 9, 14]
+  fold_seed_mode: target
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_node_edge/v8_probe

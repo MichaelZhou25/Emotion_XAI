@@ -1,0 +1,12 @@
+extends: seediv_hyperbolic_edge_only_targetseed_full100.yaml
+
+model:
+  edge_endpoint_weight: 0.5
+
+loss:
+  edge_objective: node_edge_graph
+  edge_bce_weight: 0.2
+  edge_label_smoothing: 0.0
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_node_edge/v8_full100

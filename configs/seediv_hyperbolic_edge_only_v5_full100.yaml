@@ -1,0 +1,9 @@
+extends: seediv_hyperbolic_edge_only_full100.yaml
+
+loss:
+  edge_objective: sibling_contrast
+  edge_sibling_weight: 0.1
+  edge_sibling_min_parent_depth: 1
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_edge_only/v5_full100

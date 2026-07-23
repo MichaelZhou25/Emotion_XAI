@@ -1,0 +1,25 @@
+extends: seediv_neutral_centered_path_eagle_full100.yaml
+
+model:
+  use_domain_adversarial: false
+  branch_weights:
+    path: 1.0
+    direct: 0.2
+    proto: 0.0
+    edge: 1.0
+    concept: 0.0
+
+loss:
+  name: path_core4
+  lambda_path: 1.0
+  lambda_edge: 0.1
+  lambda_hpcl: 0.02
+  lambda_direct: 0.3
+  edge_positive_weight: 1.0
+  hpcl_temperature: 0.2
+  hpcl_include_root: false
+  hpcl_leaf_weight: 1.0
+  hpcl_ancestor_weight: 0.3
+
+logging:
+  save_dir: results/seed_iv/neutral_centered_path_core4/full100

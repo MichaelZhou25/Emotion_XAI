@@ -1,0 +1,7 @@
+extends: seediv_neutral_centered_path_nonredundant_full100.yaml
+
+protocol:
+  fold_seed_mode: target
+
+logging:
+  save_dir: results/seed_iv/neutral_centered_path_nonredundant/targetseed_full100

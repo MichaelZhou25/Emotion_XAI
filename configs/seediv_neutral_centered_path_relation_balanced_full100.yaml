@@ -1,0 +1,11 @@
+extends: seediv_neutral_centered_path_eagle_full100.yaml
+
+loss:
+  lambda_path: 0.3
+  lambda_edge: 0.05
+  edge_loss_from_logits: true
+  edge_relation_balance: true
+  edge_relation_balance_max_weight: 4.0
+
+logging:
+  save_dir: results/seed_iv/neutral_centered_path_relation_balanced/full100

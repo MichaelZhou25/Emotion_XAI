@@ -1,0 +1,40 @@
+extends: seediv_neutral_centered_path_eagle_full100.yaml
+
+graph:
+  name: seediv_neutral_centered_edge_graph
+  num_nodes: 6
+  num_edges: 5
+
+model:
+  name: HyperbolicEdgeEAGLENet
+  use_direct_head: false
+  use_proto: true
+  use_edge: true
+  use_concept: false
+  use_domain_adversarial: true
+  num_domains: 15
+  grl_lambda: 0.2
+  edge_code_temperature: 1.0
+  branch_weights:
+    path: 1.0
+    direct: 0.0
+    proto: 0.0
+    edge: 1.0
+    concept: 0.0
+
+loss:
+  name: hyperbolic_edge_only
+  lambda_edge: 1.0
+  lambda_tree: 0.05
+  lambda_hpcl: 0.02
+  lambda_domain: 0.05
+  edge_positive_weight: 1.0
+  edge_relation_balance: false
+  edge_class_balance: false
+  hp_temperature: 0.2
+  hp_include_root_ancestor: false
+  hp_leaf_positive_weight: 1.0
+  hp_ancestor_positive_weight: 0.3
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_edge_only/full100

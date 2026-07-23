@@ -1,0 +1,11 @@
+extends: seediv_neutral_centered_path_relation_balanced_full100.yaml
+
+protocol:
+  target_subjects: [0, 4, 9, 14]
+  fold_seed_mode: target
+
+train:
+  epochs: 40
+
+logging:
+  save_dir: results/seed_iv/neutral_centered_path_relation_balanced/probe

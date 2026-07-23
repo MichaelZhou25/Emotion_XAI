@@ -1,0 +1,8 @@
+extends: seediv_neutral_centered_path_eagle_probe.yaml
+
+loss:
+  lambda_path: 0.3
+  lambda_edge: 0.0
+
+logging:
+  save_dir: results/seed_iv/neutral_centered_path_supervised/pathce_probe

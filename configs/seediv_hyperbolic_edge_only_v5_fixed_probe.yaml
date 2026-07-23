@@ -1,0 +1,7 @@
+extends: seediv_hyperbolic_edge_only_v5_full100.yaml
+
+protocol:
+  target_subjects: [2, 3, 5, 10]
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_edge_only/v5_fixed_probe

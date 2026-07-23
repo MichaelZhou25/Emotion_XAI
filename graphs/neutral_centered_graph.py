@@ -1,3 +1,6 @@
+from copy import deepcopy
+
+
 SEED_NEUTRAL_CENTERED_GRAPH = {
     'name': 'seed_neutral_centered_path_graph',
     'dataset': 'SEED',
@@ -112,3 +115,17 @@ SEEDIV_NEUTRAL_CENTERED_GRAPH = {
     ],
     'node_depth': [0, 1, 1, 2, 2, 2],
 }
+
+
+SEED_NEUTRAL_CENTERED_EDGE_GRAPH = deepcopy(SEED_NEUTRAL_CENTERED_GRAPH)
+SEED_NEUTRAL_CENTERED_EDGE_GRAPH.update({
+    'name': 'seed_neutral_centered_edge_graph',
+    'path_scoring': 'edge_code',
+})
+
+
+SEEDIV_NEUTRAL_CENTERED_EDGE_GRAPH = deepcopy(SEEDIV_NEUTRAL_CENTERED_GRAPH)
+SEEDIV_NEUTRAL_CENTERED_EDGE_GRAPH.update({
+    'name': 'seediv_neutral_centered_edge_graph',
+    'path_scoring': 'edge_code',
+})

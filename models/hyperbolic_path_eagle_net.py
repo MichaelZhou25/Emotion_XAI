@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.hemi_mv_eagle_net import HemiMVEAGLENet
+from models.edge_code import bernoulli_edge_code_logits
 from models.hyperbolic_prototype import expmap0, poincare_distance, project_ball
 
 
@@ -98,6 +99,8 @@ class PrototypeGuidedPathBranch(nn.Module):
         self.bound_evidence_score = bool(model_cfg.get('path_bound_evidence_score', False))
         self.evidence_score_scale = float(model_cfg.get('path_evidence_score_scale', 1.0))
         self.use_relation_bias = bool(model_cfg.get('path_use_relation_bias', True))
+        self.edge_code_temperature = float(model_cfg.get('edge_code_temperature', 1.0))
+        self.edge_endpoint_weight = float(model_cfg.get('edge_endpoint_weight', 0.0))
 
         node_to_index = {node: index for index, node in enumerate(graph['nodes'])}
         root_name = graph.get('root_node')
@@ -159,7 +162,7 @@ class PrototypeGuidedPathBranch(nn.Module):
                 raise ValueError('Neutral stop class must use the prototype root node')
             self.stop_scale_raw = nn.Parameter(torch.tensor(0.0))
             self.stop_bias = nn.Parameter(torch.tensor(0.0))
-        elif self.path_scoring == 'conditional':
+        elif self.path_scoring in {'conditional', 'edge_code'}:
             self.stop_class_index = None
             self.stop_node_index = None
             self.register_parameter('stop_scale_raw', None)
@@ -292,16 +295,30 @@ class PrototypeGuidedPathBranch(nn.Module):
         )
 
         energy_outputs = None
+        edge_code_logits = None
         if self.path_scoring == 'energy':
             energy_outputs = self._energy_path_outputs(edge_scores, node_distance)
             path_log_prob = energy_outputs['path_log_prob']
             edge_log_prob = F.logsigmoid(edge_scores)
             edge_weights = torch.sigmoid(edge_scores)
-        else:
+            branch_logits = path_log_prob
+        elif self.path_scoring == 'conditional':
             edge_log_prob = self._conditional_log_prob(edge_scores)
             class_path_score = torch.matmul(edge_log_prob, self.path_matrix.t())
             path_log_prob = F.log_softmax(class_path_score, dim=1)
             edge_weights = edge_log_prob.exp()
+            branch_logits = path_log_prob
+        else:
+            edge_log_prob = F.logsigmoid(edge_scores)
+            edge_weights = torch.sigmoid(edge_scores)
+            edge_code_logits = bernoulli_edge_code_logits(
+                edge_scores,
+                self.path_matrix,
+                temperature=self.edge_code_temperature,
+            )
+            graph_logits = edge_code_logits + self.edge_endpoint_weight * proto['logits']
+            path_log_prob = F.log_softmax(graph_logits, dim=1)
+            branch_logits = graph_logits
         path_prob = path_log_prob.exp()
 
         neutral_evidence = tokens.new_zeros((n_batch,))
@@ -318,7 +335,8 @@ class PrototypeGuidedPathBranch(nn.Module):
         edge_region_attention = attention[:, :, start:start + n_region]
 
         outputs = {
-            'logits': path_log_prob,
+            'logits': branch_logits,
+            'edge_logits': edge_scores,
             'edge_weights': edge_weights,
             'edge_attention': attention,
             'edge_evidence': evidence,
@@ -342,6 +360,10 @@ class PrototypeGuidedPathBranch(nn.Module):
         }
         if energy_outputs is not None:
             outputs.update(energy_outputs)
+        if edge_code_logits is not None:
+            outputs['edge_code_logits'] = edge_code_logits
+            outputs['edge_endpoint_logits'] = proto['logits']
+            outputs['edge_graph_logits'] = branch_logits
         return outputs
 
 
@@ -371,3 +393,20 @@ class NeutralCenteredHyperbolicPathEAGLENet(HyperbolicPathEAGLENet):
         if graph.get('root_node') != 'neutral' or graph.get('path_scoring') != 'energy':
             raise ValueError('NeutralCenteredHyperbolicPathEAGLENet requires a neutral-root energy graph')
         super().__init__(cfg, graph)
+
+
+class HyperbolicEdgeEAGLENet(HyperbolicPathEAGLENet):
+    def __init__(self, cfg, graph):
+        if graph.get('root_node') != 'neutral' or graph.get('path_scoring') != 'edge_code':
+            raise ValueError('HyperbolicEdgeEAGLENet requires a neutral-root edge-code graph')
+        super().__init__(cfg, graph)
+        if self.use_direct or self.use_concept:
+            raise ValueError('HyperbolicEdgeEAGLENet does not support direct or concept classifiers')
+
+        # Remove inactive classifier parameters so the architecture contains only
+        # prototype-guided edge decoding and the optional domain discriminator.
+        self.direct_branch = None
+        self.concept_branch = None
+
+    def _combine_logits(self, logits_direct, logits_proto, logits_edge, logits_concept):
+        return logits_edge

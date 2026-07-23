@@ -1,0 +1,7 @@
+extends: seediv_hyperbolic_edge_only_full100.yaml
+
+loss:
+  lambda_hpcl: 0.1
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_edge_only/v6_hpcl_full100

@@ -5,7 +5,9 @@ from graphs.seediv_graph import SEEDIV_GRAPH
 from graphs.seed_path_graph import SEED_PATH_GRAPH
 from graphs.seediv_path_graph import SEEDIV_PATH_GRAPH
 from graphs.neutral_centered_graph import (
+    SEED_NEUTRAL_CENTERED_EDGE_GRAPH,
     SEED_NEUTRAL_CENTERED_GRAPH,
+    SEEDIV_NEUTRAL_CENTERED_EDGE_GRAPH,
     SEEDIV_NEUTRAL_CENTERED_GRAPH,
 )
 
@@ -13,7 +15,11 @@ from graphs.neutral_centered_graph import (
 def get_affective_graph(dataset_name, graph_name=None):
     name = dataset_name.upper().replace('_', '-')
     requested = (graph_name or '').lower().replace('-', '_')
-    if requested in {'seed_neutral_centered_path_graph', 'seed_neutral_centered_graph'}:
+    if requested == 'seed_neutral_centered_edge_graph':
+        g = deepcopy(SEED_NEUTRAL_CENTERED_EDGE_GRAPH)
+    elif requested == 'seediv_neutral_centered_edge_graph':
+        g = deepcopy(SEEDIV_NEUTRAL_CENTERED_EDGE_GRAPH)
+    elif requested in {'seed_neutral_centered_path_graph', 'seed_neutral_centered_graph'}:
         g = deepcopy(SEED_NEUTRAL_CENTERED_GRAPH)
     elif requested in {'seediv_neutral_centered_path_graph', 'seediv_neutral_centered_graph'}:
         g = deepcopy(SEEDIV_NEUTRAL_CENTERED_GRAPH)

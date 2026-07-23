@@ -1,0 +1,9 @@
+extends: seediv_hyperbolic_edge_only_full100.yaml
+
+model:
+  path_bound_evidence_score: true
+  path_evidence_score_scale: 1.0
+  path_use_relation_bias: false
+
+logging:
+  save_dir: results/seed_iv/hyperbolic_edge_only/v7_bounded_full100
