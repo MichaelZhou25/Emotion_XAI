@@ -1,0 +1,9 @@
+extends: seediv_hpcl_subject_centroid_s1_phase40.yaml
+
+dataset:
+  sessions: [3]
+  session: 3
+  processed_path: data/cache/seediv_lds_de_s3_T10_stride1.npz
+
+logging:
+  save_dir: results/tuning/seediv_hpcl_centroid_phase40/s3

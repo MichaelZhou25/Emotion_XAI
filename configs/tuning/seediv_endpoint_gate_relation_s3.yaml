@@ -1,0 +1,9 @@
+extends: seediv_endpoint_gate_relation_s1.yaml
+
+dataset:
+  sessions: [3]
+  session: 3
+  processed_path: data/cache/seediv_lds_de_s3_T10_stride1.npz
+
+logging:
+  save_dir: results/tuning/seediv_gate_phase1/gate_relation/s3

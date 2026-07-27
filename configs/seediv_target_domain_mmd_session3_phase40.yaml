@@ -1,0 +1,9 @@
+extends: seediv_target_domain_uda_session3_phase40.yaml
+
+train:
+  target_adaptation:
+    feature_alignment: linear_mmd
+    feature_alignment_weight: 1.0
+
+logging:
+  save_dir: results/seed_iv/target_domain_uda/session3_mmd_phase40

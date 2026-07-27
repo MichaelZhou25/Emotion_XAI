@@ -1,0 +1,23 @@
+extends: ../seediv_hyperbolic_node_edge_v8_full100.yaml
+
+train:
+  epochs: 40
+  lr_decay_epochs: 100
+
+loss:
+  hp_subject_centroid_weight: 0.5
+  hp_subject_centroid_schedule: linear
+  hp_subject_centroid_warmup_epochs: 5
+  hp_subject_centroid_ramp_epochs: 15
+  hp_subject_hierarchy_margin_base: 0.2
+  hp_subject_hierarchy_margin_max: 0.6
+  hp_subject_neutral_margin_boost: 0.1
+  hp_subject_branch_margin_boost: 0.05
+  hp_subject_same_branch_margin_scale: 0.5
+  hp_subject_pull_weight: 1.0
+  hp_subject_margin_weight: 0.5
+  hp_subject_compactness_weight: 0.1
+  hp_subject_pair_weight_base: 1.0
+
+logging:
+  save_dir: results/tuning/seediv_hpcl_centroid_phase40/s1

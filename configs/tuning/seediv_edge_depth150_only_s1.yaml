@@ -1,0 +1,7 @@
+extends: seediv_v8_phase1_base.yaml
+
+loss:
+  edge_loss_weights: [1.0, 1.0, 1.5, 1.5, 1.5]
+
+logging:
+  save_dir: results/tuning/seediv_edge_phase1b/depth150_only/s1

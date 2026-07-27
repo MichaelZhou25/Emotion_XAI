@@ -1,0 +1,11 @@
+extends: ../seed_hyperbolic_node_edge_v8_full100.yaml
+
+protocol:
+  target_subjects: [3, 5, 8, 11]
+  fold_seed_mode: target
+
+train:
+  epochs: 40
+
+logging:
+  save_dir: results/tuning/v8_phase1/seed/baseline

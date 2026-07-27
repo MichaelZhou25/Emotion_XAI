@@ -557,6 +557,7 @@ class HemiMVEAGLENet(nn.Module):
             'edge_logits',
             'edge_code_logits',
             'edge_endpoint_logits',
+            'edge_endpoint_weights',
             'edge_graph_logits',
             'raw_edge_evidence_score',
             'edge_evidence_score',

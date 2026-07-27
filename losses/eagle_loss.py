@@ -38,6 +38,7 @@ def compute_eagle_loss(outputs, labels, graph, cfg, subject_ids=None, epoch=None
             graph,
             cfg,
             subject_ids=subject_ids,
+            epoch=epoch,
         )
     if w.get('name') == 'path_core4':
         return compute_path_core4_loss(outputs, labels, graph, cfg)

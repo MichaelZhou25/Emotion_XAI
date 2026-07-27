@@ -1,0 +1,7 @@
+extends: seed_v8_phase1_base.yaml
+
+model:
+  edge_endpoint_weight: 0.25
+
+logging:
+  save_dir: results/tuning/v8_phase1/seed/endpoint025

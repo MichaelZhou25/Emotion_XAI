@@ -1,0 +1,7 @@
+extends: ../seediv_hyperbolic_node_edge_v8_full100.yaml
+
+model:
+  edge_endpoint_weight: 0.25
+
+logging:
+  save_dir: results/tuning/v8_full15/seediv/endpoint025_s1

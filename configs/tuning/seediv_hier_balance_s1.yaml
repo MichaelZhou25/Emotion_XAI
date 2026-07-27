@@ -1,0 +1,10 @@
+extends: seediv_v8_phase1_base.yaml
+
+loss:
+  edge_root_ce_weight: 0.1
+  edge_child_ce_weight: 0.5
+  edge_graph_class_balance: true
+  edge_graph_class_balance_max_weight: 2.0
+
+logging:
+  save_dir: results/tuning/seediv_hierarchy_phase1/balance/s1

@@ -1,0 +1,8 @@
+extends: seediv_v8_phase1_base.yaml
+
+loss:
+  edge_graph_class_balance: true
+  edge_graph_class_balance_max_weight: 2.0
+
+logging:
+  save_dir: results/tuning/seediv_edge_phase1b/graph_balance/s1

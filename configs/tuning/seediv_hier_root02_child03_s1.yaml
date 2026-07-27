@@ -1,0 +1,7 @@
+extends: seediv_hier_child03_s1.yaml
+
+loss:
+  edge_root_ce_weight: 0.2
+
+logging:
+  save_dir: results/tuning/seediv_hierarchy_phase1/root02_child03/s1

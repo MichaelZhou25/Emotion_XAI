@@ -19,6 +19,9 @@ def build_lr_scheduler(optimizer, cfg):
         raise ValueError(f'Unknown lr_scheduler: {name}')
 
     total_epochs = int(train_cfg['epochs'])
+    decay_epochs = int(train_cfg.get('lr_decay_epochs', total_epochs))
+    if decay_epochs <= 0:
+        raise ValueError('lr_decay_epochs must be positive')
     warmup_epochs = int(train_cfg.get('lr_warmup_epochs', 0))
     base_lr = float(train_cfg['lr'])
     min_lr = float(train_cfg.get('min_lr', 0.0))
@@ -27,7 +30,7 @@ def build_lr_scheduler(optimizer, cfg):
     def lr_scale(epoch_index):
         if warmup_epochs > 0 and epoch_index < warmup_epochs:
             return (epoch_index + 1) / float(warmup_epochs)
-        decay_steps = max(1, total_epochs - warmup_epochs - 1)
+        decay_steps = max(1, decay_epochs - warmup_epochs - 1)
         progress = min(1.0, max(0.0, (epoch_index - warmup_epochs) / decay_steps))
         cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
         return min_ratio + (1.0 - min_ratio) * cosine

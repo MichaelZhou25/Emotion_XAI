@@ -1,0 +1,9 @@
+extends: seed_v8_phase1_grl_ramp.yaml
+
+dataset:
+  sessions: [2]
+  session: 2
+  processed_path: data/cache/seed_lds_de_s2_T30_stride1.npz
+
+logging:
+  save_dir: results/tuning/v8_phase2/seed/grl_ramp_s2

@@ -1,0 +1,9 @@
+extends: seediv_v8_phase1_base.yaml
+
+loss:
+  edge_root_ce_weight: 0.1
+  edge_child_ce_weight: 0.5
+  edge_loss_weights: [1.0, 1.0, 1.5, 1.5, 1.5]
+
+logging:
+  save_dir: results/tuning/seediv_hierarchy_phase1/depth15/s1

@@ -52,9 +52,15 @@ class LegacyLOSO:
             best_test = float('-inf')
             best_state = None
             for epoch in range(1, self.cfg['train']['epochs'] + 1):
+                target_adaptation = (
+                    self.cfg.get('train', {})
+                    .get('target_adaptation', {})
+                    .get('enabled', False)
+                )
                 train_m = train_one_epoch(
                     model, train_loader, optimizer, self.graph, self.cfg, self.device,
                     epoch=epoch, ema=ema,
+                    target_loader=test_loader if target_adaptation else None,
                 )
                 eval_model = ema.module if ema is not None else model
                 test_m, _ = evaluate(eval_model, test_loader, self.graph, self.cfg, self.device)

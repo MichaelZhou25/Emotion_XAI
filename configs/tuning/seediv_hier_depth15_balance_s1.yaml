@@ -1,0 +1,8 @@
+extends: seediv_hier_depth15_s1.yaml
+
+loss:
+  edge_graph_class_balance: true
+  edge_graph_class_balance_max_weight: 2.0
+
+logging:
+  save_dir: results/tuning/seediv_hierarchy_phase1/depth15_balance/s1

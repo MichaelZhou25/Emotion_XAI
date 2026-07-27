@@ -24,6 +24,7 @@ def edge_bce_loss(
     relation_balance_max_weight=4.0,
     class_balance=False,
     class_balance_max_weight=3.0,
+    loss_weights=None,
 ):
     targets = torch.tensor([graph['edge_targets'][int(y)] for y in labels.detach().cpu().tolist()],
                            dtype=edge_weights.dtype, device=edge_weights.device)
@@ -51,6 +52,20 @@ def edge_bce_loss(
         )
     else:
         per_edge = F.binary_cross_entropy(edge_weights, targets, reduction='none')
+
+    if loss_weights is not None:
+        edge_loss_weights = torch.as_tensor(
+            loss_weights,
+            dtype=per_edge.dtype,
+            device=per_edge.device,
+        )
+        if edge_loss_weights.ndim != 1 or edge_loss_weights.numel() != per_edge.shape[1]:
+            raise ValueError(
+                f'edge loss_weights must contain {per_edge.shape[1]} values, '
+                f'got shape {tuple(edge_loss_weights.shape)}'
+            )
+        edge_loss_weights = edge_loss_weights / edge_loss_weights.mean().clamp_min(1e-8)
+        per_edge = per_edge * edge_loss_weights.view(1, -1)
 
     per_sample = per_edge.mean(dim=1)
     if class_balance:

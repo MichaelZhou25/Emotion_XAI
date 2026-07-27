@@ -1,0 +1,12 @@
+extends: seediv_target_domain_uda_probe.yaml
+
+train:
+  target_adaptation:
+    enabled: true
+    target_domain_weight: 1.0
+    schedule: linear
+    warmup_epochs: 10
+    ramp_epochs: 10
+
+logging:
+  save_dir: results/tuning/seediv_target_domain_uda_ramp10_s1_probe

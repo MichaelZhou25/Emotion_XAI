@@ -1,0 +1,11 @@
+extends: seediv_v8_phase1_base.yaml
+
+model:
+  dropout: 0.3
+  path_dropout: 0.4
+
+train:
+  weight_decay: 0.001
+
+logging:
+  save_dir: results/tuning/v8_phase1/seediv/regularized

@@ -1,0 +1,8 @@
+extends: seed_v8_phase1_base.yaml
+
+train:
+  batch_size: 256
+  lr: 0.0003
+
+logging:
+  save_dir: results/tuning/v8_phase1/seed/batch256

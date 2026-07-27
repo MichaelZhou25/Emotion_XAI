@@ -1,0 +1,9 @@
+extends: seed_v8_phase3_combo_s1_full100.yaml
+
+dataset:
+  sessions: [3]
+  session: 3
+  processed_path: data/cache/seed_lds_de_s3_T30_stride1.npz
+
+logging:
+  save_dir: results/tuning/v8_full15/seed/combo_s3

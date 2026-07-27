@@ -1,0 +1,11 @@
+extends: ../seed_hyperbolic_node_edge_v8_full100.yaml
+
+model:
+  edge_endpoint_weight: 0.25
+  grl_lambda: 0.1
+  grl_schedule: linear
+  grl_warmup_epochs: 5
+  grl_ramp_epochs: 15
+
+logging:
+  save_dir: results/tuning/v8_full15/seed/combo_s1

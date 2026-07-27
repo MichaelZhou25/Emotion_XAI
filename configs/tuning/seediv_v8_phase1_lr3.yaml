@@ -1,0 +1,7 @@
+extends: seediv_v8_phase1_base.yaml
+
+train:
+  lr: 0.0003
+
+logging:
+  save_dir: results/tuning/v8_phase1/seediv/lr3

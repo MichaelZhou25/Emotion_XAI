@@ -1,0 +1,10 @@
+extends: seediv_v8_phase1_base.yaml
+
+model:
+  use_adaptive_endpoint_fusion: true
+  detach_endpoint_gate_features: true
+  edge_endpoint_gate_hidden: 16
+  edge_endpoint_gate_max_weight: 1.0
+
+logging:
+  save_dir: results/tuning/seediv_gate_phase1/gate_only/s1

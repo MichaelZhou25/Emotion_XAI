@@ -101,6 +101,18 @@ class PrototypeGuidedPathBranch(nn.Module):
         self.use_relation_bias = bool(model_cfg.get('path_use_relation_bias', True))
         self.edge_code_temperature = float(model_cfg.get('edge_code_temperature', 1.0))
         self.edge_endpoint_weight = float(model_cfg.get('edge_endpoint_weight', 0.0))
+        self.use_adaptive_endpoint_fusion = bool(
+            model_cfg.get('use_adaptive_endpoint_fusion', False)
+        )
+        self.detach_endpoint_gate_features = bool(
+            model_cfg.get('detach_endpoint_gate_features', True)
+        )
+        self.endpoint_gate_max_weight = float(
+            model_cfg.get('edge_endpoint_gate_max_weight', 1.0)
+        )
+        if self.endpoint_gate_max_weight <= 0:
+            raise ValueError('edge_endpoint_gate_max_weight must be positive')
+        self.endpoint_gate = None
 
         node_to_index = {node: index for index, node in enumerate(graph['nodes'])}
         root_name = graph.get('root_node')
@@ -195,6 +207,25 @@ class PrototypeGuidedPathBranch(nn.Module):
         )
         self.prototype_scale_raw = nn.Parameter(torch.tensor(0.0))
         self.relation_scale_raw = nn.Parameter(torch.tensor(0.0))
+        if self.use_adaptive_endpoint_fusion:
+            # Preserve the v8 initialization stream for every pre-existing parameter.
+            rng_state = torch.random.get_rng_state()
+            try:
+                gate_hidden = int(model_cfg.get('edge_endpoint_gate_hidden', 16))
+                self.endpoint_gate = nn.Sequential(
+                    nn.Linear(2 * self.num_classes, gate_hidden),
+                    nn.GELU(),
+                    nn.Linear(gate_hidden, self.num_classes),
+                )
+                nn.init.zeros_(self.endpoint_gate[-1].weight)
+                initial_ratio = min(
+                    max(self.edge_endpoint_weight / self.endpoint_gate_max_weight, 1e-4),
+                    1.0 - 1e-4,
+                )
+                initial_bias = math.log(initial_ratio / (1.0 - initial_ratio))
+                nn.init.constant_(self.endpoint_gate[-1].bias, initial_bias)
+            finally:
+                torch.random.set_rng_state(rng_state)
 
     def _edge_relations(self, prototypes):
         parent = prototypes.index_select(0, self.parent_indices)
@@ -215,6 +246,27 @@ class PrototypeGuidedPathBranch(nn.Module):
             values = F.log_softmax(edge_scores.index_select(1, indices), dim=1)
             edge_log_prob = edge_log_prob.scatter(1, indices.view(1, -1).expand_as(values), values)
         return edge_log_prob
+
+    @staticmethod
+    def _normalize_gate_logits(logits):
+        centered = logits - logits.mean(dim=1, keepdim=True)
+        scale = centered.square().mean(dim=1, keepdim=True).sqrt().clamp_min(1e-6)
+        return centered / scale
+
+    def _endpoint_fusion_weights(self, edge_logits, endpoint_logits):
+        if self.endpoint_gate is None:
+            return endpoint_logits.new_full(
+                endpoint_logits.shape,
+                self.edge_endpoint_weight,
+            )
+        edge_features = self._normalize_gate_logits(edge_logits)
+        endpoint_features = self._normalize_gate_logits(endpoint_logits)
+        gate_features = torch.cat([edge_features, endpoint_features], dim=1)
+        if self.detach_endpoint_gate_features:
+            gate_features = gate_features.detach()
+        return self.endpoint_gate_max_weight * torch.sigmoid(
+            self.endpoint_gate(gate_features)
+        )
 
     def _energy_path_outputs(self, edge_scores, node_distance):
         class_path_energy = torch.matmul(edge_scores, self.path_matrix.t())
@@ -316,7 +368,11 @@ class PrototypeGuidedPathBranch(nn.Module):
                 self.path_matrix,
                 temperature=self.edge_code_temperature,
             )
-            graph_logits = edge_code_logits + self.edge_endpoint_weight * proto['logits']
+            endpoint_weights = self._endpoint_fusion_weights(
+                edge_code_logits,
+                proto['logits'],
+            )
+            graph_logits = edge_code_logits + endpoint_weights * proto['logits']
             path_log_prob = F.log_softmax(graph_logits, dim=1)
             branch_logits = graph_logits
         path_prob = path_log_prob.exp()
@@ -363,6 +419,7 @@ class PrototypeGuidedPathBranch(nn.Module):
         if edge_code_logits is not None:
             outputs['edge_code_logits'] = edge_code_logits
             outputs['edge_endpoint_logits'] = proto['logits']
+            outputs['edge_endpoint_weights'] = endpoint_weights
             outputs['edge_graph_logits'] = branch_logits
         return outputs
 

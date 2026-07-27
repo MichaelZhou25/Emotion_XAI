@@ -1,0 +1,15 @@
+extends: seediv_hyperbolic_node_edge_v8_session2_full100.yaml
+
+train:
+  epochs: 40
+  lr_decay_epochs: 100
+  target_adaptation:
+    enabled: true
+    target_domain_weight: 1.0
+
+loss:
+  edge_relation_balance: true
+  edge_relation_balance_max_weight: 1.5
+
+logging:
+  save_dir: results/seed_iv/target_domain_uda/session2_phase40

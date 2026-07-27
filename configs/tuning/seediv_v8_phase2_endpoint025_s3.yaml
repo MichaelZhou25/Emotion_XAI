@@ -1,0 +1,9 @@
+extends: seediv_v8_phase1_endpoint025.yaml
+
+dataset:
+  sessions: [3]
+  session: 3
+  processed_path: data/cache/seediv_lds_de_s3_T10_stride1.npz
+
+logging:
+  save_dir: results/tuning/v8_phase2/seediv/endpoint025_s3

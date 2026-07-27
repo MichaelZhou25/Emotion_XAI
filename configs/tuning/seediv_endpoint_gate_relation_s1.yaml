@@ -1,0 +1,8 @@
+extends: seediv_endpoint_gate_s1.yaml
+
+loss:
+  edge_relation_balance: true
+  edge_relation_balance_max_weight: 1.5
+
+logging:
+  save_dir: results/tuning/seediv_gate_phase1/gate_relation/s1
