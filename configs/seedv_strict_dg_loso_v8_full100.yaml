@@ -1,0 +1,18 @@
+extends: seedv_paper_3fold_v8_full100.yaml
+
+protocol:
+  name: strict_dg_loso
+  val_ratio: 0.2
+  test_used_for_selection: false
+  fold_seed_mode: target
+
+model:
+  use_domain_adversarial: true
+  num_domains: 16
+  grl_lambda: 0.2
+
+loss:
+  lambda_domain: 0.05
+
+logging:
+  save_dir: results/seed_v/strict_dg_loso/v8_full100

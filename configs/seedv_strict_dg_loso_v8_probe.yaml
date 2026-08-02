@@ -1,0 +1,11 @@
+extends: seedv_strict_dg_loso_v8_full100.yaml
+
+protocol:
+  target_subjects: [0]
+
+train:
+  epochs: 2
+  patience: null
+
+logging:
+  save_dir: results/seed_v/strict_dg_loso/v8_probe

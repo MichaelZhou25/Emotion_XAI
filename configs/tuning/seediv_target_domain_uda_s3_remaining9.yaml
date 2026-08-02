@@ -1,7 +1,0 @@
-extends: seediv_target_domain_uda_s3_probe.yaml
-
-protocol:
-  target_subjects: [1, 2, 5, 7, 8, 9, 10, 12, 13]
-
-logging:
-  save_dir: results/tuning/seediv_target_domain_uda_s3_remaining9

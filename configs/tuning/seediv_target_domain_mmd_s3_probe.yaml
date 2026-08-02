@@ -1,7 +1,0 @@
-extends: ../seediv_target_domain_mmd_session3_phase40.yaml
-
-protocol:
-  target_subjects: [0, 3, 4, 6, 11, 14]
-
-logging:
-  save_dir: results/tuning/seediv_target_domain_mmd_s3_probe

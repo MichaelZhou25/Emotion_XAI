@@ -47,13 +47,6 @@ SESSION_CANDIDATES = {
             'configs/tuning/seediv_endpoint_gate_s1_full100.yaml',
             'results/tuning/seediv_gate_full15/gate_only/s1',
         ),
-        'target_uda': (
-            'configs/seediv_target_domain_uda_session1_phase40.yaml',
-            (
-                'results/tuning/seediv_target_domain_uda_ramp10_s1_probe',
-                'results/tuning/seediv_target_domain_uda_ramp10_s1_remaining9',
-            ),
-        ),
     },
     2: {
         'v8': (
@@ -68,13 +61,6 @@ SESSION_CANDIDATES = {
             'configs/tuning/seediv_hpcl_subject_centroid_s2_phase40.yaml',
             'results/tuning/seediv_hpcl_centroid_phase40/s2',
         ),
-        'target_uda': (
-            'configs/seediv_target_domain_uda_session2_phase40.yaml',
-            (
-                'results/tuning/seediv_target_domain_uda_s2_probe',
-                'results/tuning/seediv_target_domain_uda_s2_remaining9',
-            ),
-        ),
     },
     3: {
         'v8': (
@@ -88,13 +74,6 @@ SESSION_CANDIDATES = {
         'centroid': (
             'configs/tuning/seediv_hpcl_subject_centroid_s3_phase40.yaml',
             'results/tuning/seediv_hpcl_centroid_phase40/s3',
-        ),
-        'target_uda': (
-            'configs/seediv_target_domain_uda_session3_phase40.yaml',
-            (
-                'results/tuning/seediv_target_domain_uda_s3_probe',
-                'results/tuning/seediv_target_domain_uda_s3_remaining9',
-            ),
         ),
     },
 }

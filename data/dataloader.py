@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from data.seed import prepare_seed_features
 from data.seed_iv import prepare_seediv_features
+from data.seed_v import prepare_seedv_features
 from data.session_selection import parse_sessions, session_tag
 
 
@@ -74,6 +75,8 @@ def load_feature_store(cfg):
         prepare_seed_features(root, processed_path, ds.get('time_steps',10), ds.get('stride',1), sessions[0], ds.get('input_type','lds_de'), ds.get('num_channels',62), ds.get('num_bands',5), sessions=sessions)
     elif name in ['SEED-IV', 'SEEDIV']:
         prepare_seediv_features(root, processed_path, ds.get('time_steps',10), ds.get('stride',1), sessions[0], ds.get('input_type','lds_de'), ds.get('num_channels',62), ds.get('num_bands',5), sessions=sessions)
+    elif name in ['SEED-V', 'SEEDV']:
+        prepare_seedv_features(root, processed_path, ds.get('time_steps',10), ds.get('stride',1), sessions[0], ds.get('input_type','de'), ds.get('num_channels',62), ds.get('num_bands',5), sessions=sessions)
     else:
         raise ValueError(ds['name'])
     return load_npz_store(processed_path)
@@ -115,7 +118,14 @@ def indices_for_subjects(store, subjects):
 
 def compute_train_norm(store, train_subjects):
     idx = indices_for_subjects(store, train_subjects)
-    x = store.x[idx]
+    return compute_index_norm(store, idx)
+
+
+def compute_index_norm(store, indices):
+    indices = np.asarray(indices, dtype=np.int64)
+    if len(indices) == 0:
+        raise ValueError('Cannot compute normalization from an empty index set')
+    x = store.x[indices]
     # Per channel-band normalization across samples and time.
     mean = x.mean(axis=(0, 1), keepdims=False).astype(np.float32)[None, :, :]  # [1,C,B]
     std = x.std(axis=(0, 1), keepdims=False).astype(np.float32)[None, :, :]
@@ -135,8 +145,22 @@ def compute_subject_minmax(store):
 
 def build_loader(store, subjects, cfg, shuffle=False, batch_size=None, mean=None, std=None, subject_minmax=None):
     idx = indices_for_subjects(store, subjects)
+    return build_index_loader(
+        store,
+        idx,
+        cfg,
+        shuffle=shuffle,
+        batch_size=batch_size,
+        mean=mean,
+        std=std,
+        subject_minmax=subject_minmax,
+    )
+
+
+def build_index_loader(store, indices, cfg, shuffle=False, batch_size=None, mean=None, std=None, subject_minmax=None):
+    idx = np.asarray(indices, dtype=np.int64)
     if len(idx) == 0:
-        raise ValueError(f'No samples for subjects: {subjects}')
+        raise ValueError('No samples for requested indices')
     ds = EEGFeatureDataset(store, idx, mean=mean, std=std, subject_minmax=subject_minmax)
     return DataLoader(ds, batch_size=batch_size or cfg['train']['batch_size'], shuffle=shuffle,
                       num_workers=cfg['train'].get('num_workers', 0), drop_last=False)
@@ -153,4 +177,38 @@ def build_fold_loaders(store, train_subjects, val_subjects, test_subjects, cfg):
     train_loader = build_loader(store, train_subjects, cfg, shuffle=True, mean=mean, std=std, subject_minmax=subject_minmax)
     val_loader = None if not val_subjects else build_loader(store, val_subjects, cfg, shuffle=False, mean=mean, std=std, subject_minmax=subject_minmax)
     test_loader = build_loader(store, test_subjects, cfg, shuffle=False, mean=mean, std=std, subject_minmax=subject_minmax)
+    return train_loader, val_loader, test_loader
+
+
+def build_index_fold_loaders(store, train_indices, test_indices, cfg, val_indices=None):
+    train_indices = np.asarray(train_indices, dtype=np.int64)
+    test_indices = np.asarray(test_indices, dtype=np.int64)
+    val_indices = (
+        np.asarray(val_indices, dtype=np.int64)
+        if val_indices is not None
+        else np.empty(0, dtype=np.int64)
+    )
+    mean = std = None
+    subject_minmax = None
+    normalize = cfg['dataset'].get('normalize', 'train')
+    if normalize == 'train':
+        mean, std = compute_index_norm(store, train_indices)
+    elif normalize == 'subject_minmax':
+        # Kept for compatibility. Paper-aligned configs should use train-only
+        # normalization so held-out trial extrema cannot leak into training.
+        subject_minmax = compute_subject_minmax(store)
+    train_loader = build_index_loader(
+        store, train_indices, cfg, shuffle=True, mean=mean, std=std,
+        subject_minmax=subject_minmax,
+    )
+    val_loader = None
+    if len(val_indices):
+        val_loader = build_index_loader(
+            store, val_indices, cfg, shuffle=False, mean=mean, std=std,
+            subject_minmax=subject_minmax,
+        )
+    test_loader = build_index_loader(
+        store, test_indices, cfg, shuffle=False, mean=mean, std=std,
+        subject_minmax=subject_minmax,
+    )
     return train_loader, val_loader, test_loader

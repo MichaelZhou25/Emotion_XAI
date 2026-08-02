@@ -2,12 +2,12 @@
 
 **EAGLE-Net: Explainable Affective Geometry and Label-conditioned Evidence Network**
 
-This project implements a domain-generalized and explainable EEG emotion recognition framework for SEED and SEED-IV using extracted DE/LDS-DE features.
+This project implements an explainable EEG emotion recognition framework for SEED, SEED-IV, and SEED-V using extracted DE/LDS-DE features.
 
 ## Key Design
 
 - **Input:** extracted DE/LDS-DE features, reshaped as `[N, T, C, B]`.
-- **Datasets:** SEED and SEED-IV.
+- **Datasets:** SEED, SEED-IV, and SEED-V.
 - **Primary protocol:** `strict_dg_loso`, leakage-free source-only domain generalization.
 - **Secondary protocol:** `legacy_loso`, paper-aligned test-selected LOSO for comparison with prior open-source implementations.
 - **Model:** shared EEG encoder + direct auxiliary head + hyperbolic prototype branch + edge-conditioned evidence branch + concept branch.
@@ -21,6 +21,7 @@ python train.py --config configs/seed_strict.yaml
 python train.py --config configs/seed_legacy.yaml
 python train.py --config configs/seediv_strict.yaml
 python train.py --config configs/seediv_legacy.yaml
+python train.py --config configs/seedv.yaml
 ```
 
 ## Data Format
@@ -35,7 +36,18 @@ session_id: [num_samples]
 trial_id:   [num_samples]
 ```
 
-If no processed cache is available, the provided preprocessing scripts can read SEED/SEED-IV extracted `.mat` feature files containing `de_LDS*` or `de*` keys.
+If no processed cache is available, the provided preprocessing scripts can read SEED/SEED-IV extracted `.mat` feature files containing `de_LDS*` or `de*` keys, and official SEED-V `EEG_DE_features/*_123.npz` files.
+
+### SEED-V default protocol
+
+`configs/seedv.yaml` uses the original paper-aligned subject-dependent
+three-fold protocol. Corresponding first/middle/final five-trial groups from
+all three sessions are pooled; two groups train the model and one group tests
+it. The completed EAGLE-Net V8 result is 54.09+/-9.01% accuracy.
+
+The session-wise strict cross-subject LOSO experiment remains available as a
+diagnostic config (`configs/seedv_strict_dg_loso_v8_full100.yaml`), but it is
+not the default SEED-V result. See the [SEED-V protocol report](docs/seedv_protocol.md).
 
 ## Session Selection
 

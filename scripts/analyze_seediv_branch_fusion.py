@@ -49,34 +49,6 @@ RUNS = {
         'configs/tuning/seediv_edge_relation_balance_s3_full100.yaml',
         'results/tuning/seediv_edge_full15/relation_balance/s3',
     ),
-    (1, 'target_uda'): (
-        'configs/seediv_target_domain_uda_session1_phase40.yaml',
-        (
-            'results/tuning/seediv_target_domain_uda_ramp10_s1_probe',
-            'results/tuning/seediv_target_domain_uda_ramp10_s1_remaining9',
-        ),
-    ),
-    (2, 'target_uda'): (
-        'configs/seediv_target_domain_uda_session2_phase40.yaml',
-        (
-            'results/tuning/seediv_target_domain_uda_s2_probe',
-            'results/tuning/seediv_target_domain_uda_s2_remaining9',
-        ),
-    ),
-    (3, 'target_uda'): (
-        'configs/seediv_target_domain_uda_session3_phase40.yaml',
-        (
-            'results/tuning/seediv_target_domain_uda_s3_probe',
-            'results/tuning/seediv_target_domain_uda_s3_remaining9',
-        ),
-    ),
-    (3, 'target_mmd'): (
-        'configs/seediv_target_domain_mmd_session3_phase40.yaml',
-        (
-            'results/tuning/seediv_target_domain_mmd_s3_probe',
-            'results/tuning/seediv_target_domain_mmd_s3_remaining9',
-        ),
-    ),
 }
 
 
@@ -151,7 +123,7 @@ def main():
     parser.add_argument('--session', type=int, choices=(1, 2, 3), required=True)
     parser.add_argument(
         '--variant',
-        choices=('base', 'relation', 'target_uda', 'target_mmd'),
+        choices=('base', 'relation'),
         required=True,
     )
     parser.add_argument('--device', default='auto')

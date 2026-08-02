@@ -26,15 +26,6 @@ class StrictDGLOSO:
         self.save_dir = Path(cfg['logging']['save_dir'])
 
     def run(self):
-        if (
-            self.cfg.get('train', {})
-            .get('target_adaptation', {})
-            .get('enabled', False)
-        ):
-            raise ValueError(
-                'target_adaptation uses target-subject samples and is '
-                'incompatible with strict_dg_loso'
-            )
         all_metrics = []
         subjects = self.store.subjects
         target_subjects = self.cfg.get('protocol', {}).get('target_subjects') or subjects

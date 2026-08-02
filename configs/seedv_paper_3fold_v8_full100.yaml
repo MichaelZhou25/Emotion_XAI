@@ -1,0 +1,95 @@
+dataset:
+  name: SEED-V
+  root: E:/emotion_rec/eeg_data/SEED-V/EEG_DE_features
+  processed_path: data/cache/seedv_de_s123_T10_stride1.npz
+  input_type: de
+  normalize: train
+  num_classes: 5
+  num_subjects: 16
+  num_channels: 62
+  num_bands: 5
+  feature_dim: 310
+  time_steps: 10
+  stride: 1
+  sessions: [1, 2, 3]
+  session: 1
+  synthetic:
+    enabled: false
+    samples_per_subject: 120
+
+graph:
+  name: seedv_neutral_centered_edge_graph
+  num_nodes: 7
+  num_edges: 6
+
+protocol:
+  name: seedv_paper_3fold
+  test_used_for_selection: false
+
+model:
+  name: HyperbolicEdgeEAGLENet
+  input_mode: multiview_feature
+  d_model: 128
+  d_proto: 32
+  num_heads: 4
+  dropout: 0.2
+  token_encoder_layers: 1
+  proto_temperature: 0.5
+  num_channels: 62
+  num_bands: 5
+  window_size: 10
+  use_time_view: true
+  use_freq_view: true
+  use_channel_view: true
+  use_hemi_fusion: true
+  use_region_aggregation: true
+  use_direct_head: false
+  use_proto: true
+  use_edge: true
+  use_concept: false
+  use_domain_adversarial: false
+  prototype_root_radius: 0.0
+  prototype_depth_step: 0.22
+  path_dropout: 0.3
+  edge_code_temperature: 1.0
+  edge_endpoint_weight: 0.5
+  branch_weights:
+    path: 1.0
+    direct: 0.0
+    proto: 0.0
+    edge: 1.0
+    concept: 0.0
+
+train:
+  epochs: 100
+  batch_size: 512
+  lr: 0.0005
+  lr_scheduler: cosine
+  lr_warmup_epochs: 5
+  min_lr: 0.00001
+  weight_decay: 0.0005
+  seed: 2026
+  num_workers: 0
+  num_threads: 1
+  grad_clip: 1.0
+  device: auto
+
+loss:
+  name: hyperbolic_edge_only
+  edge_objective: node_edge_graph
+  lambda_edge: 1.0
+  lambda_tree: 0.05
+  lambda_hpcl: 0.02
+  lambda_domain: 0.0
+  edge_bce_weight: 0.2
+  edge_label_smoothing: 0.0
+  edge_positive_weight: 1.0
+  edge_relation_balance: false
+  edge_class_balance: false
+  hp_temperature: 0.2
+  hp_include_root_ancestor: false
+  hp_leaf_positive_weight: 1.0
+  hp_ancestor_positive_weight: 0.3
+
+logging:
+  save_dir: results/seed_v/paper_3fold/v8_full100

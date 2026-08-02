@@ -10,6 +10,7 @@ from data.dataloader import load_feature_store
 from data.session_selection import parse_sessions, session_tag
 from protocols.strict_dg_loso import StrictDGLOSO
 from protocols.legacy_loso import LegacyLOSO
+from protocols.seedv_paper_3fold import SeedVPaperThreeFold
 
 
 def main():
@@ -40,8 +41,13 @@ def main():
         runner = StrictDGLOSO(cfg, store)
     elif protocol == 'legacy_loso':
         runner = LegacyLOSO(cfg, store)
+    elif protocol == 'seedv_paper_3fold':
+        runner = SeedVPaperThreeFold(cfg, store)
     else:
-        raise ValueError(f'Unknown protocol: {protocol}. Only strict_dg_loso and legacy_loso are supported.')
+        raise ValueError(
+            f'Unknown protocol: {protocol}. Supported protocols: '
+            'strict_dg_loso, legacy_loso, seedv_paper_3fold.'
+        )
 
     runner.run()
 

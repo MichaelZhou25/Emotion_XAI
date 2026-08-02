@@ -4,6 +4,11 @@ from graphs.seed_graph import SEED_GRAPH
 from graphs.seediv_graph import SEEDIV_GRAPH
 from graphs.seed_path_graph import SEED_PATH_GRAPH
 from graphs.seediv_path_graph import SEEDIV_PATH_GRAPH
+from graphs.seedv_graph import (
+    SEEDV_GRAPH,
+    SEEDV_NEUTRAL_CENTERED_EDGE_GRAPH,
+    SEEDV_NEUTRAL_CENTERED_GRAPH,
+)
 from graphs.neutral_centered_graph import (
     SEED_NEUTRAL_CENTERED_EDGE_GRAPH,
     SEED_NEUTRAL_CENTERED_GRAPH,
@@ -19,10 +24,14 @@ def get_affective_graph(dataset_name, graph_name=None):
         g = deepcopy(SEED_NEUTRAL_CENTERED_EDGE_GRAPH)
     elif requested == 'seediv_neutral_centered_edge_graph':
         g = deepcopy(SEEDIV_NEUTRAL_CENTERED_EDGE_GRAPH)
+    elif requested == 'seedv_neutral_centered_edge_graph':
+        g = deepcopy(SEEDV_NEUTRAL_CENTERED_EDGE_GRAPH)
     elif requested in {'seed_neutral_centered_path_graph', 'seed_neutral_centered_graph'}:
         g = deepcopy(SEED_NEUTRAL_CENTERED_GRAPH)
     elif requested in {'seediv_neutral_centered_path_graph', 'seediv_neutral_centered_graph'}:
         g = deepcopy(SEEDIV_NEUTRAL_CENTERED_GRAPH)
+    elif requested in {'seedv_neutral_centered_path_graph', 'seedv_neutral_centered_graph'}:
+        g = deepcopy(SEEDV_NEUTRAL_CENTERED_GRAPH)
     elif requested in {'seed_hyperbolic_path_graph', 'seed_path_graph'}:
         g = deepcopy(SEED_PATH_GRAPH)
     elif requested in {'seediv_hyperbolic_path_graph', 'seediv_path_graph'}:
@@ -31,6 +40,8 @@ def get_affective_graph(dataset_name, graph_name=None):
         g = deepcopy(SEED_GRAPH)
     elif name in ['SEED-IV', 'SEEDIV']:
         g = deepcopy(SEEDIV_GRAPH)
+    elif name in ['SEED-V', 'SEEDV']:
+        g = deepcopy(SEEDV_GRAPH)
     else:
         raise ValueError(f'Unsupported dataset graph: {dataset_name}')
     g['num_classes'] = len(g['classes'])

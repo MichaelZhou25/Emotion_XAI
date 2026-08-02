@@ -1,0 +1,4 @@
+extends: seedv_paper_3fold_v8_full100.yaml
+
+# Project default for SEED-V: the original subject-dependent three-fold
+# protocol pooling the corresponding trial groups from all three sessions.

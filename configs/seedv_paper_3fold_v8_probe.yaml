@@ -1,0 +1,10 @@
+extends: seedv_paper_3fold_v8_full100.yaml
+
+protocol:
+  target_subjects: [0]
+
+train:
+  epochs: 20
+
+logging:
+  save_dir: results/seed_v/paper_3fold/v8_probe
